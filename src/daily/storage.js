@@ -47,10 +47,13 @@ export function loadStats(variant) {
   return s && s.results ? s : { results: {} };
 }
 
-/** 하루의 결과를 1회만 기록 (이미 기록돼 있으면 무시). pct = 완성률(%) — 실패 구간 분류에 씀 */
+/**
+ * 그 날의 결과를 기록한다. pct = 완성률(%) — 실패 구간 분류에 씀.
+ * 정상 플레이는 하루에 한 번만 끝낼 수 있어 어차피 1회 기록되지만, 진행 기록을 지우고
+ * (예: __resetDaily) 다시 푼 경우엔 마지막 결과로 덮어써서 통계가 실제와 어긋나지 않게 한다.
+ */
 export function recordResult(variant, date, status, elapsedMs, pct = 0) {
   const s = loadStats(variant);
-  if (s.results[date]) return s;
   s.results[date] = { status, elapsedMs, pct };
   writeJSON(STATS_KEY(variant), s);
   return s;

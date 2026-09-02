@@ -110,7 +110,7 @@ const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
-const APP_VERSION = '1.0.4'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.5'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
