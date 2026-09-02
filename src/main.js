@@ -104,7 +104,7 @@ const dailyNextCountdown  = document.getElementById('daily-next-countdown');
 const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
-const SITE_URL = 'https://nuclyee72.github.io/Adv_Sudoku_Maker/';
+const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 
 // ── 보드 조립 (빈 9x9 스타터 — 실제 퍼즐은 데일리/자유 연습에서 mountBoard로 갈아끼움) ──
 let board = new Board();
