@@ -753,9 +753,9 @@ async function startDaily(variant) {
   enterGame();
 
   if (dailyRun.ended) {
-    // 이미 끝난 판 — 잠금 상태로 보여주고 결과 모달
+    // 이미 끝난 판 — 잠금만, 블러는 없이(최종 보드가 보이게) 결과 모달
     boardLocked = true;
-    boardWrapper.classList.add('blurred');
+    boardWrapper.classList.remove('blurred');
     boardStartOverlay.classList.remove('show');
     timerDisplay.textContent = prog.status === 'solved' ? fmtMMSS(prog.elapsedMs) : '00:00';
     showDailyResult(prog.status, prog.elapsedMs);
@@ -830,7 +830,7 @@ function endDaily(status) {
   clearTimeout(dailyPersistTimer);
   btnDailyAbort.classList.add('hidden');
   boardLocked = true;
-  boardWrapper.classList.add('blurred');
+  boardWrapper.classList.remove('blurred'); // 끝난 뒤엔 최종 보드가 그대로 보이게
   timerDisplay.classList.remove('timer-danger');
 
   const elapsedMs = dailyRun.startedAt
