@@ -86,6 +86,35 @@ function formatMinSec(ms) {
   return `${Math.floor(t / 60)}분 ${t % 60}초`;
 }
 
+const CAL_EMOJI = { solved: '🟩', fail: '🟥', miss: '⬜', pad: '⬛' };
+
+/**
+ * 통계 달력을 이모지 텍스트로. results = { 'YYYY-MM-DD': { status, ... } }
+ * 성공 🟩 · 실패 🟥 · 안 함 ⬜ · 달 밖(주 정렬용) ⬛
+ */
+export function buildCalendarShareText({ variant, results, year, month, url }) {
+  const firstDow    = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(CAL_EMOJI.pad);
+  let wins = 0, fails = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const r = results[ds];
+    if (r && r.status === 'solved') { cells.push(CAL_EMOJI.solved); wins++; }
+    else if (r) { cells.push(CAL_EMOJI.fail); fails++; }
+    else cells.push(CAL_EMOJI.miss);
+  }
+  while (cells.length % 7 !== 0) cells.push(CAL_EMOJI.pad);
+  const rows = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7).join(''));
+
+  const head = `데일리 스도쿠 ${VARIANT_LABEL[variant] ?? variant} · ${year}-${String(month).padStart(2, '0')}`;
+  const parts = [head, `✅ ${wins}  ❌ ${fails}`, '', ...rows, ''];
+  if (url) parts.push(url);
+  return parts.join('\n');
+}
+
 /** 데일리 결과 공유용 전체 텍스트 */
 export function buildShareText({ date, variant, status, elapsedMs, board, solutionMap, shape, url }) {
   const pct = completionPct(board, solutionMap);

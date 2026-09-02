@@ -24,7 +24,7 @@ import {
   recordResult, summarize, DIST_BUCKETS, FAIL_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
-import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL } from './daily/share.js';
+import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL, buildCalendarShareText } from './daily/share.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -110,15 +110,22 @@ const dailyNextCountdown  = document.getElementById('daily-next-countdown');
 const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
-const archiveModal       = document.getElementById('archive-modal');
-const archiveClose       = document.getElementById('archive-close');
-const archiveDateInput   = document.getElementById('archive-date');
+const landingMain        = document.getElementById('landing-main');
+const landingArchive     = document.getElementById('landing-archive');
+const landingCard        = document.querySelector('.landing-card');
+const archiveBack        = document.getElementById('archive-back');
 const archiveErrorEl     = document.getElementById('archive-error');
 const btnArchivePlay     = document.getElementById('btn-archive-play');
+const archiveCalEl       = document.getElementById('archive-cal');
+const archiveCalTitle    = document.getElementById('archive-cal-title');
+const archiveCalPrev     = document.getElementById('archive-cal-prev');
+const archiveCalNext     = document.getElementById('archive-cal-next');
+const btnCalShare        = document.getElementById('btn-cal-share');
+const calShareNote       = document.getElementById('cal-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.7'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.8'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -691,6 +698,7 @@ function enterLanding() {
   gameScreen.classList.add('hidden');
   landingScreen.classList.remove('hidden');
   closePanel(dailyResultModal);
+  showMainView();
   refreshDailyCards();
 }
 
@@ -701,66 +709,12 @@ btnFreePlay.addEventListener('click', () => {
   openFloatingPanel(generatePanel);
 });
 
-// ── 지난 퍼즐 아카이브 (연습용 — dailyRun 없이 자유 연습처럼, 기록 반영 안 함) ──
-let archiveVariant = 'standard';
-
-function openArchiveModal() {
-  archiveErrorEl.textContent = '';
-  const yesterday = shiftDateStr(TODAY(), -1);
-  archiveDateInput.min = DAILY_FIRST_DATE;
-  archiveDateInput.max = yesterday;
-  const v = archiveDateInput.value;
-  if (!v || v < DAILY_FIRST_DATE || v > yesterday) archiveDateInput.value = yesterday;
-  document.querySelectorAll('.archive-type').forEach((b) => {
-    b.classList.toggle('active', b.dataset.variant === archiveVariant);
-  });
-  openPanel(archiveModal);
-}
-function closeArchiveModal() { closePanel(archiveModal); }
-
-btnArchive.addEventListener('click', openArchiveModal);
-archiveClose.addEventListener('click', closeArchiveModal);
-archiveModal.addEventListener('click', (e) => { if (e.target === archiveModal) closeArchiveModal(); });
-document.querySelectorAll('.archive-type').forEach((b) => {
-  b.addEventListener('click', () => {
-    archiveVariant = b.dataset.variant;
-    document.querySelectorAll('.archive-type').forEach((x) => x.classList.toggle('active', x === b));
-  });
-});
-
-btnArchivePlay.addEventListener('click', async () => {
-  const dateStr = archiveDateInput.value;
-  const yesterday = shiftDateStr(TODAY(), -1);
-  if (!dateStr || dateStr < DAILY_FIRST_DATE || dateStr > yesterday) {
-    archiveErrorEl.textContent = `${DAILY_FIRST_DATE} ~ ${yesterday} 사이 날짜를 골라주세요.`;
-    return;
-  }
-  btnArchivePlay.disabled = true;
-  archiveErrorEl.textContent = '';
-  let data;
-  try {
-    data = await fetchDaily(dateStr);
-  } catch {
-    btnArchivePlay.disabled = false;
-    archiveErrorEl.textContent = '그 날짜의 퍼즐을 찾을 수 없어요.';
-    return;
-  }
-  btnArchivePlay.disabled = false;
-
-  const vd = data[archiveVariant];
-  exitDailyMode(); // 데일리/타이머 상태 정리 + 자유 연습 컨트롤 on
-  mountBoard(reviveStructures(vd.structures), vd.givens);
-  currentPuzzleSolution = vd.solution ?? null;
-  cachedSolution = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
-  if (archiveVariant === 'extended' && vd.elements) {
-    renderElementSidebar({ variant: 'extended', elements: vd.elements });
-  }
-  closeArchiveModal();
-  enterGame();
-});
+btnArchive.addEventListener('click', () => showArchiveView());
+archiveBack.addEventListener('click', () => showMainView());
 
 btnGoLanding.addEventListener('click', () => {
-  if (dailyRun && !dailyRun.ended) {
+  // 시작 전(startedAt 없음)엔 타이머가 흐르지도, 저장할 것도 없으므로 안내 문구를 빼고 간단히 확인만
+  if (dailyRun && !dailyRun.ended && dailyRun.startedAt) {
     askConfirm('메인 화면으로 돌아갈까요?<br/>진행 상황은 저장되고, 타이머는 계속 흘러갑니다.', () => {
       persistDailyNow();
       exitDailyMode();
@@ -1093,8 +1047,8 @@ let statsCountdownTimer = null;
 
 function openStatsModal(variant = 'standard') {
   statsVariant = variant;
-  calMonthOffset = 0;
-  renderStatsModal();
+  calShareNote.textContent = '';
+  renderStatsModal(true);
   openPanel(dailyStatsModal);
   clearInterval(statsCountdownTimer);
   const tick = () => { dailyNextCountdown.textContent = formatCountdown(msUntilNextReset()); };
@@ -1107,12 +1061,8 @@ function closeStatsModal() {
   clearInterval(statsCountdownTimer);
 }
 
-// ── 통계 달력(히트맵) ──
+// ── 통계 달력(히트맵) — 통계창 + 지난 퍼즐 아카이브 공용 ──
 const CAL_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-let calMonthOffset = 0; // 0 = 이번 달, -1 = 지난 달 … (미래는 못 봄)
-
-dailyCalPrev.addEventListener('click', () => { calMonthOffset -= 1; renderStatsModal(); });
-dailyCalNext.addEventListener('click', () => { if (calMonthOffset < 0) { calMonthOffset += 1; renderStatsModal(); } });
 
 // 평균보다 빠를수록 진한 초록 (성공)
 function calSolveColor(ms, avg) {
@@ -1128,79 +1078,197 @@ function calFailColor(pct, avg) {
   return `hsl(5 58% ${48 + k * 11}%)`;                    // 37%(적음) ~ 59%(많음)
 }
 
-function renderStatsCalendar(s) {
-  const today = TODAY();
-  const [ty, tm] = today.split('-').map(Number);
+/**
+ * 월간 히트맵 달력 인스턴스. gridEl에 그린다.
+ * pick=true면 [minDate,maxDate] 안의 날짜를 클릭해 선택할 수 있고 onPick(date)를 부른다.
+ */
+function makeCalendar({ gridEl, titleEl, prevEl, nextEl, pick = false, onPick = null }) {
+  let monthOffset = 0;
+  let sum = { results: {}, avgSolveMs: null, avgFailPct: null };
+  let selected = null;
+  let minDate = null, maxDate = null;
 
-  const base = new Date(Date.UTC(ty, tm - 1 + calMonthOffset, 1));
-  const y = base.getUTCFullYear();
-  const m = base.getUTCMonth() + 1;
-  dailyCalTitle.textContent = `${y}년 ${m}월`;
-  dailyCalNext.disabled = calMonthOffset >= 0;
-
-  const firstDow    = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0=일
-  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-
-  dailyStatsCal.innerHTML = '';
-
-  const head = document.createElement('div');
-  head.className = 'cal-grid cal-head';
-  for (const w of CAL_WEEKDAYS) {
-    const c = document.createElement('span');
-    c.className = 'cal-dow';
-    c.textContent = w;
-    head.appendChild(c);
-  }
-  dailyStatsCal.appendChild(head);
-
-  const grid = document.createElement('div');
-  grid.className = 'cal-grid';
-
-  for (let i = 0; i < firstDow; i++) {
-    const blank = document.createElement('span');
-    blank.className = 'cal-cell cal-cell--blank';
-    grid.appendChild(blank);
+  function monthYM() {
+    const [ty, tm] = TODAY().split('-').map(Number);
+    const b = new Date(Date.UTC(ty, tm - 1 + monthOffset, 1));
+    return { y: b.getUTCFullYear(), m: b.getUTCMonth() + 1 };
   }
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const r = s.results[dateStr];
-    const cell = document.createElement('span');
-    cell.className = 'cal-cell';
-    if (dateStr === today) cell.classList.add('cal-cell--today');
+  function render() {
+    const today = TODAY();
+    const { y, m } = monthYM();
+    const mm = String(m).padStart(2, '0');
+    titleEl.textContent = `${y}년 ${m}월`;
+    if (nextEl) nextEl.disabled = monthOffset >= 0;
+    if (prevEl) prevEl.disabled = !!minDate && `${y}-${mm}` <= minDate.slice(0, 7);
 
-    const dayNum = document.createElement('span');
-    dayNum.className = 'cal-day';
-    dayNum.textContent = d;
-    cell.appendChild(dayNum);
+    const firstDow    = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
 
-    if (r && r.status === 'solved') {
-      cell.classList.add('cal-cell--filled');
-      cell.style.background = calSolveColor(r.elapsedMs, s.avgSolveMs);
-      const v = document.createElement('span');
-      v.className = 'cal-val';
-      v.textContent = fmtMMSS(r.elapsedMs);
-      cell.appendChild(v);
-    } else if (r) {
-      cell.classList.add('cal-cell--filled');
-      cell.style.background = calFailColor(r.pct, s.avgFailPct);
-      const v = document.createElement('span');
-      v.className = 'cal-val';
-      v.textContent = `${r.pct ?? 0}%`;
-      cell.appendChild(v);
-    } else if (dateStr > today) {
-      cell.classList.add('cal-cell--future');
-    } else {
-      cell.classList.add('cal-cell--miss');
+    gridEl.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'cal-grid cal-head';
+    for (const w of CAL_WEEKDAYS) {
+      const c = document.createElement('span');
+      c.className = 'cal-dow';
+      c.textContent = w;
+      head.appendChild(c);
+    }
+    gridEl.appendChild(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+    for (let i = 0; i < firstDow; i++) {
+      const b = document.createElement('span');
+      b.className = 'cal-cell cal-cell--blank';
+      grid.appendChild(b);
     }
 
-    grid.appendChild(cell);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${y}-${mm}-${String(d).padStart(2, '0')}`;
+      const r = sum.results[dateStr];
+      const cell = document.createElement('span');
+      cell.className = 'cal-cell';
+      if (dateStr === today) cell.classList.add('cal-cell--today');
+      if (pick && dateStr === selected) cell.classList.add('cal-cell--picked');
+
+      const dayNum = document.createElement('span');
+      dayNum.className = 'cal-day';
+      dayNum.textContent = d;
+      cell.appendChild(dayNum);
+
+      if (r && r.status === 'solved') {
+        cell.classList.add('cal-cell--filled');
+        cell.style.background = calSolveColor(r.elapsedMs, sum.avgSolveMs);
+        const v = document.createElement('span');
+        v.className = 'cal-val';
+        v.textContent = fmtMMSS(r.elapsedMs);
+        cell.appendChild(v);
+      } else if (r) {
+        cell.classList.add('cal-cell--filled');
+        cell.style.background = calFailColor(r.pct, sum.avgFailPct);
+        const v = document.createElement('span');
+        v.className = 'cal-val';
+        v.textContent = `${r.pct ?? 0}%`;
+        cell.appendChild(v);
+      } else if (dateStr > today) {
+        cell.classList.add('cal-cell--future');
+      } else {
+        cell.classList.add('cal-cell--miss');
+      }
+
+      if (pick && dateStr >= minDate && dateStr <= maxDate) {
+        cell.classList.add('cal-cell--pickable');
+        cell.addEventListener('click', () => {
+          selected = dateStr;
+          render();
+          onPick?.(dateStr);
+        });
+      }
+      grid.appendChild(cell);
+    }
+    gridEl.appendChild(grid);
   }
 
-  dailyStatsCal.appendChild(grid);
+  prevEl?.addEventListener('click', () => { monthOffset -= 1; render(); });
+  nextEl?.addEventListener('click', () => { if (monthOffset < 0) { monthOffset += 1; render(); } });
+
+  return {
+    render,
+    monthYM,
+    get selected() { return selected; },
+    open(summary, { selected: sel = null, minDate: mn = null, maxDate: mx = null, resetMonth = true } = {}) {
+      sum = summary;
+      selected = sel;
+      minDate = mn;
+      maxDate = mx;
+      if (resetMonth) monthOffset = 0;
+      render();
+    },
+  };
 }
 
-function renderStatsModal() {
+const statsCal = makeCalendar({
+  gridEl: dailyStatsCal, titleEl: dailyCalTitle, prevEl: dailyCalPrev, nextEl: dailyCalNext,
+});
+
+// ── 지난 퍼즐 아카이브 (메인 카드 안 서브뷰 · 연습용 · 기록 반영 안 함) ──
+let archiveVariant = 'standard';
+let archiveSelected = null;
+
+const archiveCal = makeCalendar({
+  gridEl: archiveCalEl, titleEl: archiveCalTitle, prevEl: archiveCalPrev, nextEl: archiveCalNext,
+  pick: true,
+  onPick: (dateStr) => {
+    archiveSelected = dateStr;
+    btnArchivePlay.disabled = false;
+    archiveErrorEl.textContent = '';
+  },
+});
+
+function paintArchiveCal(resetMonth) {
+  archiveCal.open(summarize(archiveVariant, TODAY()), {
+    selected: archiveSelected,
+    minDate: DAILY_FIRST_DATE,
+    maxDate: shiftDateStr(TODAY(), -1),
+    resetMonth,
+  });
+}
+
+function showMainView() {
+  landingArchive.hidden = true;
+  landingMain.hidden = false;
+  landingCard.classList.remove('landing-card--archive');
+}
+
+function showArchiveView() {
+  archiveSelected = null;
+  btnArchivePlay.disabled = true;
+  archiveErrorEl.textContent = '';
+  document.querySelectorAll('#landing-archive .archive-type').forEach((b) => {
+    b.classList.toggle('active', b.dataset.variant === archiveVariant);
+  });
+  landingMain.hidden = true;
+  landingArchive.hidden = false;
+  landingCard.classList.add('landing-card--archive');
+  paintArchiveCal(true);
+}
+
+document.querySelectorAll('#landing-archive .archive-type').forEach((b) => {
+  b.addEventListener('click', () => {
+    archiveVariant = b.dataset.variant;
+    document.querySelectorAll('#landing-archive .archive-type').forEach((x) => x.classList.toggle('active', x === b));
+    paintArchiveCal(false); // 달·선택은 유지하고 색만 다시
+  });
+});
+
+btnArchivePlay.addEventListener('click', async () => {
+  if (!archiveSelected) return;
+  btnArchivePlay.disabled = true;
+  archiveErrorEl.textContent = '';
+  let data;
+  try {
+    data = await fetchDaily(archiveSelected);
+  } catch {
+    btnArchivePlay.disabled = false;
+    archiveErrorEl.textContent = '그 날짜의 퍼즐을 찾을 수 없어요.';
+    return;
+  }
+  btnArchivePlay.disabled = false;
+
+  const vd = data[archiveVariant];
+  exitDailyMode(); // 데일리/타이머 상태 정리 + 자유 연습 컨트롤 on
+  mountBoard(reviveStructures(vd.structures), vd.givens);
+  currentPuzzleSolution = vd.solution ?? null;
+  cachedSolution = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
+  if (archiveVariant === 'extended' && vd.elements) {
+    renderElementSidebar({ variant: 'extended', elements: vd.elements });
+  }
+  showMainView();
+  enterGame();
+});
+
+function renderStatsModal(resetMonth = false) {
   document.querySelectorAll('.daily-stats-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.variant === statsVariant);
   });
@@ -1211,7 +1279,7 @@ function renderStatsModal() {
   statStreak.textContent = s.curStreak;
   statMaxStreak.textContent = s.maxStreak;
 
-  renderStatsCalendar(s);
+  statsCal.open(s, { minDate: DAILY_FIRST_DATE, resetMonth });
 
   const max = Math.max(1, ...s.distribution);
   dailyStatsDist.innerHTML = '';
@@ -1238,7 +1306,20 @@ function renderStatsModal() {
 }
 
 document.querySelectorAll('.daily-stats-tab').forEach((t) => {
-  t.addEventListener('click', () => { statsVariant = t.dataset.variant; renderStatsModal(); });
+  t.addEventListener('click', () => {
+    statsVariant = t.dataset.variant;
+    calShareNote.textContent = '';
+    renderStatsModal(false); // 달은 유지, 색만 다시
+  });
+});
+
+btnCalShare.addEventListener('click', () => {
+  const { y, m } = statsCal.monthYM();
+  const s = summarize(statsVariant, TODAY());
+  const text = buildCalendarShareText({
+    variant: statsVariant, results: s.results, year: y, month: m, url: SITE_URL,
+  });
+  shareText(text, calShareNote);
 });
 dailyStatsClose.addEventListener('click', closeStatsModal);
 dailyStatsModal.addEventListener('click', (e) => { if (e.target === dailyStatsModal) closeStatsModal(); });
@@ -1397,8 +1478,8 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePanel(dailyResultModal);
     return;
   }
-  if (archiveModal.classList.contains('show')) {
-    if (e.key === 'Escape') closeArchiveModal();
+  if (!landingArchive.hidden) {
+    if (e.key === 'Escape') showMainView();
     return;
   }
 
