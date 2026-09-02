@@ -83,7 +83,8 @@ export function bucketIndexFor(status, elapsedMs, pct = 0) {
 
 /**
  * @param {string} todayStr 현재 KST 날짜 — 연승 계산 기준
- * @returns {{ played, wins, winRate, curStreak, maxStreak, distribution: number[] }}
+ * @returns {{ played, wins, winRate, curStreak, maxStreak, distribution: number[],
+ *   results: Record<string,{status,elapsedMs,pct}>, avgSolveMs: number|null, avgFailPct: number|null }}
  */
 export function summarize(variant, todayStr) {
   const { results } = loadStats(variant);
@@ -91,9 +92,11 @@ export function summarize(variant, todayStr) {
   const played = dates.length;
   let wins = 0;
   const distribution = DIST_BUCKETS.map(() => 0);
+  let solveMsSum = 0, failPctSum = 0, failCount = 0;
   for (const d of dates) {
     const r = results[d];
-    if (r.status === 'solved') wins++;
+    if (r.status === 'solved') { wins++; solveMsSum += r.elapsedMs || 0; }
+    else { failCount++; failPctSum += r.pct || 0; }
     distribution[bucketIndexFor(r.status, r.elapsedMs, r.pct)]++;
   }
 
@@ -125,5 +128,8 @@ export function summarize(variant, todayStr) {
     curStreak,
     maxStreak,
     distribution,
+    results,
+    avgSolveMs: wins ? solveMsSum / wins : null,
+    avgFailPct: failCount ? failPctSum / failCount : null,
   };
 }

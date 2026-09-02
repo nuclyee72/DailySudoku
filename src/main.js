@@ -101,12 +101,16 @@ const statWinRate        = document.getElementById('stat-winrate');
 const statStreak         = document.getElementById('stat-streak');
 const statMaxStreak      = document.getElementById('stat-maxstreak');
 const dailyStatsDist     = document.getElementById('daily-stats-dist');
+const dailyStatsCal      = document.getElementById('daily-stats-cal');
+const dailyCalTitle      = document.getElementById('daily-cal-title');
+const dailyCalPrev       = document.getElementById('daily-cal-prev');
+const dailyCalNext       = document.getElementById('daily-cal-next');
 const dailyNextCountdown  = document.getElementById('daily-next-countdown');
 const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
-const APP_VERSION = '1.0.3'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.4'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -1023,6 +1027,7 @@ let statsCountdownTimer = null;
 
 function openStatsModal(variant = 'standard') {
   statsVariant = variant;
+  calMonthOffset = 0;
   renderStatsModal();
   openPanel(dailyStatsModal);
   clearInterval(statsCountdownTimer);
@@ -1036,6 +1041,99 @@ function closeStatsModal() {
   clearInterval(statsCountdownTimer);
 }
 
+// ── 통계 달력(히트맵) ──
+const CAL_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+let calMonthOffset = 0; // 0 = 이번 달, -1 = 지난 달 … (미래는 못 봄)
+
+dailyCalPrev.addEventListener('click', () => { calMonthOffset -= 1; renderStatsModal(); });
+dailyCalNext.addEventListener('click', () => { if (calMonthOffset < 0) { calMonthOffset += 1; renderStatsModal(); } });
+
+// 평균보다 빠를수록 진한 초록 (성공)
+function calSolveColor(ms, avg) {
+  if (!avg) return 'hsl(145 42% 45%)';
+  const k = Math.max(-1, Math.min(1, (avg - ms) / avg)); // + = 평균보다 빠름
+  return `hsl(145 42% ${46 - k * 12}%)`;                  // 34%(빠름) ~ 58%(느림)
+}
+// 완성률이 평균보다 높을수록 옅은 빨강, 낮을수록 진한 빨강 (실패)
+function calFailColor(pct, avg) {
+  const p = pct ?? 0;
+  if (!avg) return 'hsl(5 58% 52%)';
+  const k = Math.max(-1, Math.min(1, (p - avg) / avg));   // + = 평균보다 많이 채움
+  return `hsl(5 58% ${48 + k * 11}%)`;                    // 37%(적음) ~ 59%(많음)
+}
+
+function renderStatsCalendar(s) {
+  const today = TODAY();
+  const [ty, tm] = today.split('-').map(Number);
+
+  const base = new Date(Date.UTC(ty, tm - 1 + calMonthOffset, 1));
+  const y = base.getUTCFullYear();
+  const m = base.getUTCMonth() + 1;
+  dailyCalTitle.textContent = `${y}년 ${m}월`;
+  dailyCalNext.disabled = calMonthOffset >= 0;
+
+  const firstDow    = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0=일
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  dailyStatsCal.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'cal-grid cal-head';
+  for (const w of CAL_WEEKDAYS) {
+    const c = document.createElement('span');
+    c.className = 'cal-dow';
+    c.textContent = w;
+    head.appendChild(c);
+  }
+  dailyStatsCal.appendChild(head);
+
+  const grid = document.createElement('div');
+  grid.className = 'cal-grid';
+
+  for (let i = 0; i < firstDow; i++) {
+    const blank = document.createElement('span');
+    blank.className = 'cal-cell cal-cell--blank';
+    grid.appendChild(blank);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const r = s.results[dateStr];
+    const cell = document.createElement('span');
+    cell.className = 'cal-cell';
+    if (dateStr === today) cell.classList.add('cal-cell--today');
+
+    const dayNum = document.createElement('span');
+    dayNum.className = 'cal-day';
+    dayNum.textContent = d;
+    cell.appendChild(dayNum);
+
+    if (r && r.status === 'solved') {
+      cell.classList.add('cal-cell--filled');
+      cell.style.background = calSolveColor(r.elapsedMs, s.avgSolveMs);
+      const v = document.createElement('span');
+      v.className = 'cal-val';
+      v.textContent = fmtMMSS(r.elapsedMs);
+      cell.appendChild(v);
+    } else if (r) {
+      cell.classList.add('cal-cell--filled');
+      cell.style.background = calFailColor(r.pct, s.avgFailPct);
+      const v = document.createElement('span');
+      v.className = 'cal-val';
+      v.textContent = `${r.pct ?? 0}%`;
+      cell.appendChild(v);
+    } else if (dateStr > today) {
+      cell.classList.add('cal-cell--future');
+    } else {
+      cell.classList.add('cal-cell--miss');
+    }
+
+    grid.appendChild(cell);
+  }
+
+  dailyStatsCal.appendChild(grid);
+}
+
 function renderStatsModal() {
   document.querySelectorAll('.daily-stats-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.variant === statsVariant);
@@ -1046,6 +1144,8 @@ function renderStatsModal() {
   statWinRate.textContent = s.winRate;
   statStreak.textContent = s.curStreak;
   statMaxStreak.textContent = s.maxStreak;
+
+  renderStatsCalendar(s);
 
   const max = Math.max(1, ...s.distribution);
   dailyStatsDist.innerHTML = '';
