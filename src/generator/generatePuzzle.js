@@ -76,6 +76,8 @@ async function tryGenerate(template) {
   }
 
   const difficulty = template.difficulty ?? 3;
+  // 데일리는 template.restoreRatio를 명시적으로 넘겨 난이도 기반 계산을 덮어쓴다.
+  const restoreRatio = template.restoreRatio ?? restoreRatioFor(difficulty);
   const { removedCells } = await carveGivens(board, { turntableRegions: turntables, requireLogicSolvable: true });
 
   // 무작위 대신 "가장 나중에 지워진" 칸부터 되돌린다 — removedCells는 캐빙 루프가 지운
@@ -83,7 +85,7 @@ async function tryGenerate(template) {
   // 칸(=복구하기 가장 어려운 칸)이다. 무작위 복원은 어려운 지점을 그대로 남겨둘 수 있지만,
   // 이렇게 하면 실제로 어려운 지점부터 겨냥해서 낮출 수 있다. 난이도가 높을수록(5=예전
   // "보통") restoreRatioFor가 0에 가까워져 사실상 복원이 없어진다.
-  const restoreCount = Math.round(removedCells.length * restoreRatioFor(difficulty));
+  const restoreCount = Math.round(removedCells.length * restoreRatio);
   if (restoreCount > 0) { // slice(-0)은 slice(0)과 같아서 전체를 복원해버리므로 반드시 방어
     for (const { cell, value } of removedCells.slice(-restoreCount)) {
       cell.isGiven = true;

@@ -162,5 +162,7 @@ export function buildTemplateFromSelection(resolved) {
     boards,
     rules,
     difficulty: resolved.difficulty,
+    // 데일리는 명시적 복원 비율을 실어 보낸다(없으면 generatePuzzle이 난이도에서 계산)
+    restoreRatio: resolved.restoreRatio,
   };
 }

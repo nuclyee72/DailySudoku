@@ -14,15 +14,22 @@ export function dailySeed(dateStr) { return `daily:${dateStr}`; }
 export const DAILY_SHAPES = ['pair_h', 'pair_v', 'pair_diag'];
 
 // ── 요소 풀: 매일 main 풀에서 1개 + sub 풀에서 1개를 시드로 뽑는다 ──
-// 여기를 바꾸면 daily/*.json 을 반드시 다시 생성해야 한다:
+// 아래 상수(요소 풀 / 난이도 / 복원 비율)를 바꾸면 daily/*.json 을 반드시 다시 생성해야 한다:
 //   rm daily/*.json && npm run generate-daily -- 2026-09-01 30
 /** main 풀 */
 export const MAIN_ELEMENTS = ['inequality', 'consecutive'];
 /** sub 풀 */
 export const SUB_ELEMENTS = ['snake', 'turntable'];
 
-/** 난이도는 데일리에서 항상 "보통"(3) 고정 */
+/** 스네이크 길이·턴테이블 크기 범위를 정하는 난이도 — 데일리는 "보통"(3) 고정 */
 export const DAILY_DIFFICULTY = 3;
+
+/**
+ * 캐빙(given 최대 제거) 직후 되돌릴 given 비율. 난이도 3의 기본값은 0.175지만
+ * 데일리는 시작을 더 빡세게 하려고 0.05로 낮춰 잡는다(값을 되돌릴수록 쉬워짐).
+ * generatePuzzle 이 template.restoreRatio 로 받아 restoreRatioFor(difficulty)를 덮어쓴다.
+ */
+export const DAILY_RESTORE_RATIO = 0.05;
 
 const NONE_ELEMENTS = { inequality: 'none', consecutive: 'none', snake: 'none', turntable: 'none', random: false };
 
@@ -46,11 +53,14 @@ export function dailySelections(dateStr) {
   const meta = pickDailyMeta(dateStr);
   return {
     meta,
-    standard: { shapeId: meta.shapeId, elements: { ...NONE_ELEMENTS }, difficulty: meta.difficulty },
+    standard: {
+      shapeId: meta.shapeId, elements: { ...NONE_ELEMENTS },
+      difficulty: meta.difficulty, restoreRatio: DAILY_RESTORE_RATIO,
+    },
     extended: {
       shapeId: meta.shapeId,
       elements: { ...NONE_ELEMENTS, [meta.main]: 'normal', [meta.sub]: 'normal' },
-      difficulty: meta.difficulty,
+      difficulty: meta.difficulty, restoreRatio: DAILY_RESTORE_RATIO,
     },
   };
 }
