@@ -2,8 +2,8 @@ name: Daily puzzle
 
 on:
   schedule:
-    # 15:00 UTC = 00:00 KST — 그 날의 KST 날짜로 퍼즐 생성
-    - cron: '0 15 * * *'
+    # 20:00 UTC = 05:00 KST — 데일리 리셋(KST 06:00) 1시간 전에 그 날+3일치 미리 생성
+    - cron: '0 20 * * *'
   workflow_dispatch:
     inputs:
       start_date:

@@ -18,7 +18,7 @@ import { solveBoard } from './generator/solveBoard.js';
 import { reviveStructures } from './puzzles/reviveStructures.js';
 import { layoutMode, isMobile, onLayoutChange } from './ui/layoutMode.js';
 
-import { dateStrKST, shiftDateStr, msUntilNextKSTMidnight, formatCountdown } from './daily/dateUtil.js';
+import { dateStrKST, shiftDateStr, msUntilNextReset, formatCountdown } from './daily/dateUtil.js';
 import {
   DAILY_LIMIT_MS, loadProgress, saveProgress, patchProgressCells,
   recordResult, summarize, DIST_BUCKETS, FAIL_BUCKETS,
@@ -110,7 +110,7 @@ const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
-const APP_VERSION = '1.0.5'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.6'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -1031,7 +1031,7 @@ function openStatsModal(variant = 'standard') {
   renderStatsModal();
   openPanel(dailyStatsModal);
   clearInterval(statsCountdownTimer);
-  const tick = () => { dailyNextCountdown.textContent = formatCountdown(msUntilNextKSTMidnight()); };
+  const tick = () => { dailyNextCountdown.textContent = formatCountdown(msUntilNextReset()); };
   tick();
   statsCountdownTimer = setInterval(tick, 1000);
 }

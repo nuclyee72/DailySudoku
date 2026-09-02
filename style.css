@@ -69,38 +69,15 @@
   --cell-selected-hover: #2c5a41;
 }
 
-/* ── 스크롤 가능한 영역들의 스크롤바 — 브라우저 기본(흰색 계열) 대신 테마 색에 맞춰
-   얇고 은은하게 표시한다(다크 모드에서 특히 도드라지던 문제를 해결) ── */
-.kp-extra-scroll,
-.floating-panel,
-.shape-picker-menu {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--text-given-rgb), 0.25) transparent;
+/* ── 스크롤바는 모든 곳에서 숨긴다 (스크롤 동작 자체는 그대로) ── */
+* {
+  scrollbar-width: none;     /* Firefox */
+  -ms-overflow-style: none;  /* 구형 Edge/IE */
 }
-
-.kp-extra-scroll::-webkit-scrollbar,
-.floating-panel::-webkit-scrollbar,
-.shape-picker-menu::-webkit-scrollbar {
-  width: 8px;
-}
-
-.kp-extra-scroll::-webkit-scrollbar-track,
-.floating-panel::-webkit-scrollbar-track,
-.shape-picker-menu::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.kp-extra-scroll::-webkit-scrollbar-thumb,
-.floating-panel::-webkit-scrollbar-thumb,
-.shape-picker-menu::-webkit-scrollbar-thumb {
-  background: rgba(var(--text-given-rgb), 0.25);
-  border-radius: 999px;
-}
-
-.kp-extra-scroll::-webkit-scrollbar-thumb:hover,
-.floating-panel::-webkit-scrollbar-thumb:hover,
-.shape-picker-menu::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--text-given-rgb), 0.4);
+*::-webkit-scrollbar {       /* Chrome / Safari / 신형 Edge */
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 * { box-sizing: border-box; }
