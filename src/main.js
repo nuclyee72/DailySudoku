@@ -1053,7 +1053,7 @@ function renderStatsModal() {
     const barWrap = document.createElement('span');
     barWrap.className = 'dist-bar-wrap';
     const bar = document.createElement('span');
-    bar.className = 'dist-bar' + (i === 5 ? ' dist-bar-fail' : '');
+    bar.className = 'dist-bar' + (i === DIST_BUCKETS.length - 1 ? ' dist-bar-fail' : '');
     bar.style.width = `${(count / max) * 100}%`;
     bar.textContent = count;
     barWrap.appendChild(bar);

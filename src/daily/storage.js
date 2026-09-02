@@ -58,16 +58,18 @@ export function recordResult(variant, date, status, elapsedMs) {
 
 // ── 집계 (통계창) ──
 
-const BUCKET_EDGES_MIN = [3, 6, 9, 12, 15]; // 분 경계, 마지막 15분 초과는 없음(타임아웃이면 fail)
-export const DIST_BUCKETS = ['0–3분', '3–6분', '6–9분', '9–12분', '12–15분', '실패'];
+// 10분 미만은 한 칸("~10분"), 10분부터는 1분 간격, 마지막은 실패(타임아웃/도중종료).
+// DIST_BUCKETS.length === BUCKET_EDGES_MIN.length + 1 을 항상 유지할 것.
+const BUCKET_EDGES_MIN = [10, 11, 12, 13, 14, 15];
+export const DIST_BUCKETS = ['~10분', '10–11분', '11–12분', '12–13분', '13–14분', '14–15분', '실패'];
 
 export function bucketIndexFor(status, elapsedMs) {
-  if (status !== 'solved') return 5;
+  if (status !== 'solved') return DIST_BUCKETS.length - 1; // 실패
   const min = elapsedMs / 60000;
   for (let i = 0; i < BUCKET_EDGES_MIN.length; i++) {
     if (min < BUCKET_EDGES_MIN[i]) return i;
   }
-  return 4;
+  return BUCKET_EDGES_MIN.length - 1; // 15분에 딱 맞춰 푼 극단값 → 마지막 정답 칸으로
 }
 
 /**
@@ -79,7 +81,7 @@ export function summarize(variant, todayStr) {
   const dates = Object.keys(results).sort();
   const played = dates.length;
   let wins = 0;
-  const distribution = [0, 0, 0, 0, 0, 0];
+  const distribution = DIST_BUCKETS.map(() => 0);
   for (const d of dates) {
     const r = results[d];
     if (r.status === 'solved') wins++;
