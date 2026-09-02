@@ -5,13 +5,21 @@
  *   0–20% ⬛ · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
  *
  * 공유 텍스트 형식:
- *   12분 34초 · 100% ✅ ‹ 🐍      (요소는 이모지만, 스탠다드는 이모지 없음)
+ *   2026-09-02 · 스탠다드 · 12분 34초 · 100% ✅ [‹ 🐍]   (요소는 이모지만 [] 안에, 스탠다드는 요소 없음)
  *   (빈 줄)
  *   <그리드>
  *   (빈 줄)
  *   <링크>
  */
 import { ELEMENT_INFO } from './elementInfo.js';
+
+export const VARIANT_LABEL = { standard: '스탠다드', extended: '익스텐디드' };
+
+/** 요소 키 배열 → "[아이콘 아이콘]" (없으면 빈 문자열) */
+export function elementBracket(keys) {
+  const icons = (keys ?? []).map((k) => ELEMENT_INFO[k]?.icon).filter(Boolean).join(' ');
+  return icons ? `[${icons}]` : '';
+}
 
 const TIER_EMOJI = ['⬛', '🟫', '🟧', '🟨', '🟩'];
 const ALL_GIVEN_EMOJI = '⬜';
@@ -86,17 +94,14 @@ function formatMinSec(ms) {
 }
 
 /** 데일리 결과 공유용 전체 텍스트 */
-export function buildShareText({ variant, status, elapsedMs, elements, board, solutionMap, shape, url }) {
+export function buildShareText({ date, variant, status, elapsedMs, elements, board, solutionMap, shape, url }) {
   const pct = completionPct(board, solutionMap);
   const mark = status === 'solved' ? '✅' : '❌';
 
-  let line1 = `${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
+  let line1 = `${date} · ${VARIANT_LABEL[variant] ?? variant} · ${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
   if (variant === 'extended' && elements) {
-    const icons = [elements.main, elements.sub]
-      .map((k) => ELEMENT_INFO[k]?.icon)
-      .filter(Boolean)
-      .join(' ');
-    if (icons) line1 += ` ${icons}`;
+    const bracket = elementBracket([elements.main, elements.sub]);
+    if (bracket) line1 += ` ${bracket}`;
   }
 
   const parts = [line1, '', ...buildShareGrid(board, solutionMap, shape), ''];

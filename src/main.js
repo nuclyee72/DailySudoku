@@ -24,7 +24,7 @@ import {
   recordResult, summarize, DIST_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
-import { buildShareText, buildShareGrid, completionPct } from './daily/share.js';
+import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL, elementBracket } from './daily/share.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -694,8 +694,7 @@ function refreshDailyCards() {
     const p = loadProgress(TODAY(), variant);
     if (!p) { badge.textContent = '아직 안 함'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
-    else if (p.status === 'timeout') { badge.textContent = '❌ 타임아웃'; badge.dataset.status = 'timeout'; }
-    else if (p.status === 'gaveup') { badge.textContent = '🚪 종료'; badge.dataset.status = 'timeout'; }
+    else if (p.status === 'timeout' || p.status === 'gaveup') { badge.textContent = '❌ 실패'; badge.dataset.status = 'timeout'; }
     else { badge.textContent = '진행 중'; badge.dataset.status = 'playing'; }
   }
 }
@@ -923,12 +922,17 @@ function fmtMinSec(ms) {
 }
 
 function showDailyResult(status, elapsedMs) {
-  dailyResultTitle.textContent =
-    status === 'solved' ? '🎉 클리어!' :
-    status === 'gaveup' ? '🚪 도중 종료' :
-    '⏱ 타임아웃';
+  const variant = dailyRun?.variant ?? 'standard';
+  dailyResultTitle.textContent = `${dailyRun?.date ?? TODAY()} · ${VARIANT_LABEL[variant] ?? variant}`;
+
   const pct = dailyRun ? completionPct(board, dailyRun.solutionMap) : 0;
-  dailyResultDetail.textContent = `${fmtMinSec(elapsedMs)} · ${pct}%`;
+  const mark = status === 'solved' ? '✅' : '❌';
+  let detail = `${fmtMinSec(elapsedMs)} · ${pct}% ${mark}`;
+  if (variant === 'extended' && dailyRun?.elements) {
+    const bracket = elementBracket([dailyRun.elements.main, dailyRun.elements.sub]);
+    if (bracket) detail += ` ${bracket}`;
+  }
+  dailyResultDetail.textContent = detail;
 
   dailyResultGrid.textContent = dailyRun
     ? buildShareGrid(board, dailyRun.solutionMap, dailyRun.shape).join('\n')
