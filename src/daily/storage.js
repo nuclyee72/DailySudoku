@@ -4,7 +4,7 @@
  */
 import { shiftDateStr } from './dateUtil.js';
 
-export const DAILY_LIMIT_MS = 20 * 60 * 1000; // 20분
+export const DAILY_LIMIT_MS = 15 * 60 * 1000; // 15분
 
 const PROGRESS_KEY = (date, variant) => `dsudoku:progress:${date}:${variant}`;
 const STATS_KEY = (variant) => `dsudoku:stats:${variant}`;
@@ -58,8 +58,8 @@ export function recordResult(variant, date, status, elapsedMs) {
 
 // ── 집계 (통계창) ──
 
-const BUCKET_EDGES_MIN = [4, 8, 12, 16, 20]; // 분 경계, 마지막 20분 초과는 없음(타임아웃이면 fail)
-export const DIST_BUCKETS = ['0–4분', '4–8분', '8–12분', '12–16분', '16–20분', '실패'];
+const BUCKET_EDGES_MIN = [3, 6, 9, 12, 15]; // 분 경계, 마지막 15분 초과는 없음(타임아웃이면 fail)
+export const DIST_BUCKETS = ['0–3분', '3–6분', '6–9분', '9–12분', '12–15분', '실패'];
 
 export function bucketIndexFor(status, elapsedMs) {
   if (status !== 'solved') return 5;
