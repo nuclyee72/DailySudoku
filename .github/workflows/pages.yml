@@ -1,0 +1,42 @@
+name: Deploy Pages
+
+on:
+  # 코드 push (내 커밋)
+  push:
+    branches: [main]
+  # "Daily puzzle" 크론이 daily/*.json 을 커밋한 뒤에도 재배포
+  # (GITHUB_TOKEN 봇 커밋의 push는 다른 워크플로를 직접 트리거하지 못하므로 workflow_run 사용)
+  workflow_run:
+    workflows: ["Daily puzzle"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp -r index.html style.css .nojekyll src daily _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
