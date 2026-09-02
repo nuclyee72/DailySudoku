@@ -87,6 +87,8 @@ function formatMinSec(ms) {
 }
 
 const CAL_EMOJI = { solved: '🟩', fail: '🟥', miss: '⬜', pad: '⬛' };
+// 요일 머리글 — 이모지 폭에 맞춘 전각 라틴(일~토 = Sun Mon Tue Wed Thu Fri Sat)
+const CAL_DOW_HEAD = 'ＳＭＴＷＴＦＳ';
 
 /**
  * 통계 달력을 이모지 텍스트로. results = { 'YYYY-MM-DD': { status, ... } }
@@ -110,7 +112,7 @@ export function buildCalendarShareText({ variant, results, year, month, url }) {
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7).join(''));
 
   const head = `데일리 스도쿠 ${VARIANT_LABEL[variant] ?? variant} · ${year}-${String(month).padStart(2, '0')}`;
-  const parts = [head, `✅ ${wins}  ❌ ${fails}`, '', ...rows, ''];
+  const parts = [head, `✅ ${wins}  ❌ ${fails}`, '', CAL_DOW_HEAD, ...rows, ''];
   if (url) parts.push(url);
   return parts.join('\n');
 }
