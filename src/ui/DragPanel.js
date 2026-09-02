@@ -44,6 +44,12 @@ export class DragPanel {
     this._dragEndedAt     = 0;
     this._activePointerId = null;
 
+    // 이동 중에는 left/top(레이아웃 유발, 비합성) 대신 transform으로 옮기고,
+    // 제스처가 끝나면 최종 위치를 left/top으로 커밋한다. 그 사이 "정답 위치"는 계속 left/top.
+    this._gBounds = null;
+    this._gBaseL = 0; this._gBaseT = 0;
+    this._gCurL  = 0; this._gCurT  = 0;
+
     this._onPointerDown = this._onPointerDown.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
     this._onPointerUp   = this._onPointerUp.bind(this);
@@ -81,6 +87,43 @@ export class DragPanel {
     const b = this._bounds();
     this.panel.style.left = `${Math.max(b.minX, Math.min(x, b.maxX))}px`;
     this.panel.style.top  = `${Math.max(b.minY, Math.min(y, b.maxY))}px`;
+  }
+
+  // ── transform 기반 이동 (드래그 / WASD 팬 공용) ──
+  _beginGesture() {
+    const r = this.panel.getBoundingClientRect();
+    this._gBaseL = this._gCurL = r.left;
+    this._gBaseT = this._gCurT = r.top;
+    this._gBounds = this._bounds(); // 제스처 동안 크기는 안 변하므로 한 번만 읽는다
+    this.panel.style.willChange = 'transform';
+  }
+
+  _moveGesture(x, y) {
+    const b = this._gBounds;
+    this._gCurL = Math.max(b.minX, Math.min(x, b.maxX));
+    this._gCurT = Math.max(b.minY, Math.min(y, b.maxY));
+    this.panel.style.transform =
+      `translate3d(${this._gCurL - this._gBaseL}px, ${this._gCurT - this._gBaseT}px, 0)`;
+  }
+
+  _endGesture() {
+    if (!this._gBounds) return;
+    this.panel.style.transform = '';
+    this.panel.style.willChange = '';
+    this.panel.style.left = `${Math.round(this._gCurL)}px`;
+    this.panel.style.top  = `${Math.round(this._gCurT)}px`;
+    this._gBounds = null;
+  }
+
+  /** 키보드 팬(WASD): 연속 호출 중엔 transform, 멈추면 settle()이 커밋 */
+  panBy(dx, dy) {
+    if (this._activePointerId !== null) return; // 마우스/터치 드래그 중이면 양보
+    if (!this._gBounds) this._beginGesture();
+    this._moveGesture(this._gCurL + dx, this._gCurT + dy);
+  }
+
+  settle() {
+    if (this._gBounds && this._activePointerId === null) this._endGesture();
   }
 
   /** 드래그가 50ms 이내에 끝났으면 true */
@@ -135,17 +178,20 @@ export class DragPanel {
       // _activePointerId가 세팅된 뒤라 다음 시도를 막지는 않는다 - pointerup/cancel이
       // 정상적으로 붙어있으므로 이번 제스처는 그대로 정리된다.
       this.handle.setPointerCapture(e.pointerId);
+      this._endGesture();     // 혹시 남아있던 WASD 팬 커밋
+      this._beginGesture();
     }
 
     if (!this._isDrag) return;
 
-    this._applyPos(e.clientX - this._offsetX, e.clientY - this._offsetY);
+    this._moveGesture(e.clientX - this._offsetX, e.clientY - this._offsetY);
   }
 
   _onPointerUp(e) {
     if (e.pointerId !== this._activePointerId) return;
 
     if (this._isDrag) {
+      this._endGesture();
       this._dragEndedAt = Date.now();
       this.panel.style.cursor = '';
     }

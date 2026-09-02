@@ -211,6 +211,7 @@ function clearFloatingPanelPositions() {
 }
 
 onLayoutChange(() => {
+  boardDrag.settle(); // 진행 중이던 팬 transform을 정리하고 나서 재배치
   layoutKeypad();
   clearFloatingPanelPositions();
   fitAndCenterBoard();
@@ -718,7 +719,11 @@ function refreshDailyCards() {
     const expired = p && p.status === 'playing' && p.startedAt && Date.now() > p.startedAt + DAILY_LIMIT_MS;
     if (!p) { badge.textContent = '플레이 전'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
-    else if (p.status === 'timeout' || p.status === 'gaveup' || expired) { badge.textContent = '❌ 실패'; badge.dataset.status = 'timeout'; }
+    else if (p.status === 'timeout' || p.status === 'gaveup') {
+      badge.textContent = p.pct != null ? `❌ ${p.pct}%` : '❌ 실패';
+      badge.dataset.status = 'timeout';
+    }
+    else if (expired) { badge.textContent = '❌ 시간 초과'; badge.dataset.status = 'timeout'; }
     else { badge.textContent = '플레이 중'; badge.dataset.status = 'playing'; }
   }
 }
@@ -874,7 +879,7 @@ function endDaily(status) {
   saveProgress({
     date: dailyRun.date, variant: dailyRun.variant,
     startedAt: dailyRun.startedAt, status,
-    cells: board.serialize(), elapsedMs, finishedAt: Date.now(),
+    cells: board.serialize(), elapsedMs, pct, finishedAt: Date.now(),
   });
   recordResult(dailyRun.variant, dailyRun.date, status, elapsedMs, pct);
   refreshDailyCards();
@@ -1295,15 +1300,15 @@ window.addEventListener('blur', () => heldKeys.clear());
 let lastTick = null;
 function panLoop(t) {
   if (lastTick === null) lastTick = t;
-  const dt = (t - lastTick) / 1000;
+  const dt = Math.min(0.05, (t - lastTick) / 1000); // 프레임 하나 건너뛰어도 판이 튀지 않게 상한
   lastTick = t;
-  if (heldKeys.size) {
-    let dx = 0, dy = 0;
-    for (const k of heldKeys) { dx += WASD_DIR[k][0]; dy += WASD_DIR[k][1]; }
-    if (dx || dy) {
-      const len = Math.hypot(dx, dy) || 1;
-      boardDrag.moveBy((dx / len) * PAN_SPEED * dt, (dy / len) * PAN_SPEED * dt);
-    }
+  let dx = 0, dy = 0;
+  for (const k of heldKeys) { dx += WASD_DIR[k][0]; dy += WASD_DIR[k][1]; }
+  if (dx || dy) {
+    const len = Math.hypot(dx, dy) || 1;
+    boardDrag.panBy((dx / len) * PAN_SPEED * dt, (dy / len) * PAN_SPEED * dt);
+  } else {
+    boardDrag.settle(); // 키에서 손을 뗐으면 transform → left/top 커밋
   }
   requestAnimationFrame(panLoop);
 }
