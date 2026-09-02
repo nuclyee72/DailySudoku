@@ -4,8 +4,9 @@
  * 그리드: 퍼즐의 각 3x3 박스마다 "비-기본칸 중 정답과 일치하는 비율"을 5단계 색(각 20%)으로.
  *   0–20% ⬛ · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
  *
- * 공유 텍스트 형식:
- *   2026-09-02 · 스탠다드 · 12분 34초 · 100% ✅ [‹ 🐍]   (요소는 이모지만 [] 안에, 스탠다드는 요소 없음)
+ * 공유 텍스트 형식 (결과창 제목/상세와 같은 2줄 구성):
+ *   2026-09-02 · 익스텐디드
+ *   12분 34초 · 100% ✅ [‹ 🐍]        (요소는 이모지만 [] 안에, 스탠다드는 요소 없음)
  *   (빈 줄)
  *   <그리드>
  *   (빈 줄)
@@ -98,13 +99,14 @@ export function buildShareText({ date, variant, status, elapsedMs, elements, boa
   const pct = completionPct(board, solutionMap);
   const mark = status === 'solved' ? '✅' : '❌';
 
-  let line1 = `${date} · ${VARIANT_LABEL[variant] ?? variant} · ${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
+  const head = `${date} · ${VARIANT_LABEL[variant] ?? variant}`;
+  let detail = `${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
   if (variant === 'extended' && elements) {
     const bracket = elementBracket([elements.main, elements.sub]);
-    if (bracket) line1 += ` ${bracket}`;
+    if (bracket) detail += ` ${bracket}`;
   }
 
-  const parts = [line1, '', ...buildShareGrid(board, solutionMap, shape), ''];
+  const parts = [head, detail, '', ...buildShareGrid(board, solutionMap, shape), ''];
   if (url) parts.push(url);
   return parts.join('\n');
 }
