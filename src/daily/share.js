@@ -71,7 +71,9 @@ export function buildShareText({ date, variant, status, elapsedMs, elements, boa
   const head = `데일리 스도쿠 ${date} · ${VARIANT_LABEL[variant] ?? variant}`;
   const result = status === 'solved'
     ? `⏱️ ${mmss(elapsedMs)} / 20:00  ✅`
-    : `⏱️ 타임아웃 (20:00)  ❌`;
+    : status === 'gaveup'
+      ? `🚪 도중 종료  ❌`
+      : `⏱️ 타임아웃 (20:00)  ❌`;
 
   const parts = [head, result];
   if (variant === 'extended' && elements) {

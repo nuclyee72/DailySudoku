@@ -81,9 +81,7 @@ const btnLandingDark     = document.getElementById('btn-landing-dark');
 const btnGoLanding       = document.getElementById('btn-go-landing');
 
 const elementSidebar     = document.getElementById('element-sidebar');
-const elementSidebarHandle = document.getElementById('element-sidebar-handle');
-const elementSidebarIcons  = document.getElementById('element-sidebar-icons');
-const elementSidebarList   = document.getElementById('element-sidebar-list');
+const btnDailyAbort      = document.getElementById('btn-daily-abort');
 
 const dailyResultModal   = document.getElementById('daily-result-modal');
 const dailyResultTitle   = document.getElementById('daily-result-title');
@@ -696,6 +694,7 @@ function refreshDailyCards() {
     if (!p) { badge.textContent = '아직 안 함'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
     else if (p.status === 'timeout') { badge.textContent = '❌ 타임아웃'; badge.dataset.status = 'timeout'; }
+    else if (p.status === 'gaveup') { badge.textContent = '🚪 종료'; badge.dataset.status = 'timeout'; }
     else { badge.textContent = '진행 중'; badge.dataset.status = 'playing'; }
   }
 }
@@ -743,6 +742,7 @@ async function startDaily(variant) {
 
   // 데일리에선 저장/불러오기/답지/자동생성 숨김 (워들식 — 힌트·재생성 불가)
   setFreePlayControls(false);
+  btnDailyAbort.classList.toggle('hidden', dailyRun.ended);
   renderElementSidebar(dailyRun);
 
   timerEnabled = false;
@@ -828,6 +828,7 @@ function endDaily(status) {
   dailyRun.ended = true;
   stopDailyCountdown();
   clearTimeout(dailyPersistTimer);
+  btnDailyAbort.classList.add('hidden');
   boardLocked = true;
   boardWrapper.classList.add('blurred');
   timerDisplay.classList.remove('timer-danger');
@@ -851,7 +852,8 @@ function exitDailyMode() {
   clearTimeout(dailyPersistTimer);
   dailyRun = null;
   elementSidebar.hidden = true;
-  elementSidebar.classList.remove('open');
+  elementSidebar.innerHTML = '';
+  btnDailyAbort.classList.add('hidden');
   timerDisplay.classList.remove('timer-danger', 'show');
   boardLocked = false;
   boardWrapper.classList.remove('blurred');
@@ -873,35 +875,45 @@ function setFreePlayControls(on) {
 btnDailyStandard.addEventListener('click', () => startDaily('standard'));
 btnDailyExtended.addEventListener('click', () => startDaily('extended'));
 
-// ── 요소 안내 사이드바 (책갈피) ──
+btnDailyAbort.addEventListener('click', () => {
+  if (!dailyRun || dailyRun.ended) return;
+  if (!dailyRun.startedAt) {
+    askConfirm('시작하지 않고 메인 화면으로 나갈까요?', () => { exitDailyMode(); enterLanding(); });
+    return;
+  }
+  askConfirm('지금 종료할까요?<br/>이 판은 <b>실패</b>로 기록되고 오늘은 다시 풀 수 없어요.', () => endDaily('gaveup'));
+});
+
+// ── 요소 안내 사이드바 (책갈피) — 요소마다 독립된 책갈피 하나씩 ──
 function renderElementSidebar(run) {
+  elementSidebar.innerHTML = '';
   if (!run || run.variant !== 'extended' || !run.elements) {
     elementSidebar.hidden = true;
     return;
   }
-  const keys = [run.elements.main, run.elements.sub];
-  elementSidebarIcons.innerHTML = '';
-  elementSidebarList.innerHTML = '';
-  keys.forEach((key, i) => {
+  const entries = [
+    { key: run.elements.main, role: 'main' },
+    { key: run.elements.sub, role: 'sub' },
+  ];
+  for (const { key, role } of entries) {
     const info = ELEMENT_INFO[key];
-    if (!info) return;
+    if (!info) continue;
 
-    const icon = document.createElement('span');
-    icon.className = 'element-sidebar-icon' + (i === 0 ? ' is-main' : '');
-    icon.textContent = info.icon;
-    elementSidebarIcons.appendChild(icon);
-
-    const item = document.createElement('div');
-    item.className = 'element-sidebar-item';
-    item.innerHTML =
-      `<span class="element-sidebar-item-head"><b>${info.icon}</b> ${info.label}` +
-      `<em>${i === 0 ? 'main' : 'sub'}</em></span>` +
-      `<span class="element-sidebar-item-desc">${info.desc}</span>`;
-    elementSidebarList.appendChild(item);
-  });
+    const bm = document.createElement('div');
+    bm.className = 'element-bookmark';
+    bm.innerHTML =
+      `<div class="element-bookmark-body">` +
+      `<span class="element-bookmark-head"><b>${info.icon}</b> ${info.label}<em>${role}</em></span>` +
+      `<span class="element-bookmark-desc">${info.desc}</span>` +
+      `</div>` +
+      `<button class="element-bookmark-handle" type="button" aria-label="${info.label} 설명 열기/닫기">` +
+      `<span class="element-bookmark-icon">${info.icon}</span></button>`;
+    bm.querySelector('.element-bookmark-handle')
+      .addEventListener('click', () => bm.classList.toggle('open'));
+    elementSidebar.appendChild(bm);
+  }
   elementSidebar.hidden = false;
 }
-elementSidebarHandle.addEventListener('click', () => elementSidebar.classList.toggle('open'));
 
 // ── 데일리 결과 모달 ──
 function computeCompletionPct() {
@@ -919,7 +931,10 @@ function computeCompletionPct() {
 
 function showDailyResult(status, elapsedMs) {
   const isWin = status === 'solved';
-  dailyResultTitle.textContent = isWin ? '🎉 클리어!' : '⏱ 타임아웃';
+  dailyResultTitle.textContent =
+    status === 'solved' ? '🎉 클리어!' :
+    status === 'gaveup' ? '🚪 도중 종료' :
+    '⏱ 타임아웃';
   dailyResultDetail.textContent = isWin
     ? `${fmtMMSS(elapsedMs)} 만에 완성`
     : `${computeCompletionPct()}% 완성`;

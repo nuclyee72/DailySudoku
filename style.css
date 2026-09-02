@@ -1175,6 +1175,16 @@ html, body {
   display: none;
 }
 
+.kp-extra-danger {
+  background: var(--surface-danger);
+  color: var(--conflict);
+}
+
+.kp-extra-danger:hover {
+  background: var(--surface-danger);
+  filter: brightness(0.97);
+}
+
 .kp-panel-body {
   width: 232px;
   padding: 20px;
@@ -2130,27 +2140,39 @@ kbd {
   50% { opacity: 0.55; }
 }
 
-/* 요소 안내 사이드바 (책갈피) */
+/* 요소 안내 사이드바 (책갈피) — 요소마다 독립 책갈피 하나씩, 각자 펼침/접힘 */
 .element-sidebar {
   position: fixed;
-  top: 96px;
+  top: 88px;
   left: 0;
   z-index: 40;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  transform: translateX(calc(-1 * var(--sidebar-body-w, 260px)));
+  gap: 12px;
+}
+
+.element-sidebar[hidden] { display: none; }
+
+.element-bookmark {
+  --bw: 250px;
+  display: flex;
+  align-items: stretch;
+  transform: translateX(calc(-1 * var(--bw)));
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.element-sidebar.open { transform: translateX(0); }
-.element-sidebar[hidden] { display: none; }
+.element-bookmark.open { transform: translateX(0); }
 
-.element-sidebar-body {
-  --sidebar-body-w: 260px;
-  width: 260px;
-  padding: 18px 16px;
+.element-bookmark-body {
+  order: 1;
+  width: var(--bw);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px;
   border-radius: 0 4px 4px 0;
-  background: rgba(var(--glass-rgb), 0.94);
+  background: rgba(var(--glass-rgb), 0.95);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(var(--glass-rgb), 0.6);
@@ -2158,50 +2180,29 @@ kbd {
   box-shadow: 12px 0 40px rgba(20, 24, 40, 0.18);
 }
 
-.element-sidebar-handle {
+.element-bookmark-handle {
   order: 2;
   align-self: stretch;
-  min-height: 92px;
-  padding: 12px 6px;
+  min-height: 76px;
+  padding: 10px 7px;
   border: 1px solid rgba(var(--glass-rgb), 0.6);
   border-left: none;
   border-radius: 0 12px 12px 0;
   background: var(--text-input);
   cursor: pointer;
-  writing-mode: vertical-rl;
   box-shadow: 6px 0 18px rgba(20, 24, 40, 0.16);
 }
 
-.element-sidebar-icons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
+.element-bookmark:nth-child(2) .element-bookmark-handle { background: var(--snake-default); }
+
+.element-bookmark-icon {
+  display: block;
   color: #fff;
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1;
 }
 
-.element-sidebar-title {
-  margin: 0 0 12px;
-  font-family: 'Outfit', 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-given);
-}
-
-.element-sidebar-list { display: flex; flex-direction: column; gap: 12px; }
-
-.element-sidebar-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-}
-
-.element-sidebar-item-head {
+.element-bookmark-head {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2211,9 +2212,9 @@ kbd {
   color: var(--text-given);
 }
 
-.element-sidebar-item-head b { font-size: 16px; }
+.element-bookmark-head b { font-size: 16px; }
 
-.element-sidebar-item-head em {
+.element-bookmark-head em {
   margin-left: auto;
   font-style: normal;
   font-size: 10px;
@@ -2226,16 +2227,14 @@ kbd {
   color: rgba(var(--text-given-rgb), 0.55);
 }
 
-.element-sidebar-item-desc {
+.element-bookmark-desc {
   font-size: 12px;
   line-height: 1.55;
   color: rgba(var(--text-given-rgb), 0.7);
 }
 
-[data-layout^="mobile"] .element-sidebar { top: 60px; }
-[data-layout^="mobile"] .element-sidebar,
-[data-layout^="mobile"] .element-sidebar-body { --sidebar-body-w: min(78vw, 260px); }
-[data-layout^="mobile"] .element-sidebar-body { width: min(78vw, 260px); }
+[data-layout^="mobile"] .element-sidebar { top: 56px; gap: 8px; }
+[data-layout^="mobile"] .element-bookmark { --bw: min(74vw, 250px); }
 
 /* 데일리 결과 모달 */
 .daily-result-card { width: min(340px, calc(100vw - 32px)); text-align: center; }

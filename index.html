@@ -61,16 +61,9 @@
     </div>
   </div>
 
-  <!-- 요소 안내 사이드바 (책갈피) — 데일리 익스텐디드에서만 표시 -->
-  <div id="element-sidebar" class="element-sidebar" hidden>
-    <button id="element-sidebar-handle" class="element-sidebar-handle" type="button" aria-label="요소 안내 열기/닫기">
-      <span id="element-sidebar-icons" class="element-sidebar-icons"></span>
-    </button>
-    <div class="element-sidebar-body">
-      <h2 class="element-sidebar-title">이 퍼즐의 요소</h2>
-      <div id="element-sidebar-list" class="element-sidebar-list"></div>
-    </div>
-  </div>
+  <!-- 요소 안내 사이드바 (책갈피) — 데일리 익스텐디드에서만 표시.
+       요소마다 독립된 책갈피 하나씩 (main.js가 채운다) -->
+  <div id="element-sidebar" class="element-sidebar" hidden></div>
 
   <!-- 숫자 입력 키패드 패널 -->
   <div id="keypad-panel" class="keypad-panel">
@@ -87,6 +80,7 @@
             <button id="btn-open-help" class="kp-extra-btn" type="button">도움말</button>
           </div>
           <button id="btn-open-generate" class="kp-extra-btn kp-extra-pinned" type="button">자동 생성</button>
+          <button id="btn-daily-abort" class="kp-extra-btn kp-extra-pinned kp-extra-danger hidden" type="button">도중 종료</button>
           <button id="btn-go-landing" class="kp-extra-btn kp-extra-home" type="button">메인 화면으로</button>
         </div>
       </div>

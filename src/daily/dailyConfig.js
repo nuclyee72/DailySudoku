@@ -13,10 +13,13 @@ export function dailySeed(dateStr) { return `daily:${dateStr}`; }
 /** 데일리 판 모양 후보 — 9x9 2판이 3칸 겹치는 배치 (세로/가로/대각) */
 export const DAILY_SHAPES = ['pair_h', 'pair_v', 'pair_diag'];
 
-/** main 요소: 영역 기반(보드당 1개) — 스네이크 / 턴테이블 */
-export const MAIN_ELEMENTS = ['snake', 'turntable'];
-/** sub 요소: 인접쌍 커버리지 — 부등호 / 연속 */
-export const SUB_ELEMENTS = ['inequality', 'consecutive'];
+// ── 요소 풀: 매일 main 풀에서 1개 + sub 풀에서 1개를 시드로 뽑는다 ──
+// 여기를 바꾸면 daily/*.json 을 반드시 다시 생성해야 한다:
+//   rm daily/*.json && npm run generate-daily -- 2026-09-01 30
+/** main 풀 */
+export const MAIN_ELEMENTS = ['inequality', 'consecutive'];
+/** sub 풀 */
+export const SUB_ELEMENTS = ['snake', 'turntable'];
 
 /** 난이도는 데일리에서 항상 "보통"(3) 고정 */
 export const DAILY_DIFFICULTY = 3;
