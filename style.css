@@ -2150,6 +2150,10 @@ kbd {
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+  /* 접힌 책갈피의 본문은 화면 밖으로 transform 되지만 레이아웃 폭(≈290px)은 그대로라,
+     이 컨테이너가 화면 좌측 상단을 덮는 투명 상자로 남아 게임판 클릭을 가로챈다.
+     컨테이너/래퍼는 클릭을 통과시키고, 실제로 보이는 손잡이·본문만 이벤트를 받게 한다. */
+  pointer-events: none;
 }
 
 .element-sidebar[hidden] { display: none; }
@@ -2160,9 +2164,13 @@ kbd {
   align-items: stretch;
   transform: translateX(calc(-1 * var(--bw)));
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
 }
 
 .element-bookmark.open { transform: translateX(0); }
+
+.element-bookmark-handle,
+.element-bookmark-body { pointer-events: auto; }
 
 .element-bookmark-body {
   order: 1;
