@@ -1,35 +1,38 @@
 /**
  * main.js — 진입점, 보드/UI 조립 및 이벤트 바인딩
+ *
+ * 데일리 스도쿠(스탠다드/익스텐디드) + 자유 연습(랜덤 생성). 순수 정적 사이트.
  */
 import { Board } from './core/Board.js';
 import { BoardRenderer } from './ui/BoardRenderer.js';
 import { DragPanel } from './ui/DragPanel.js';
 import { Keypad } from './ui/Keypad.js';
-import { PUZZLES } from './puzzles/index.js';
+import { createStandardSudokuStructures } from './structures/StandardSudoku.js';
 import { shapes as GENERATE_SHAPES, getShape, renderShapeThumb } from './generator/shapes.js';
 import {
   ELEMENT_KEYS, DIFFICULTY_LEVELS, AMOUNTS, ELEMENT_LABELS, DIFFICULTY_LABELS, AMOUNT_LABELS,
-  resolveRandomSelection, encodeSelectionId, decodeSelectionId,
-  buildTemplateFromSelection,
+  resolveRandomSelection, buildTemplateFromSelection,
 } from './generator/composeTemplate.js';
 import { generatePuzzle } from './generator/generatePuzzle.js';
 import { solveBoard } from './generator/solveBoard.js';
-import * as roomClient from './net/roomClient.js';
 import { reviveStructures } from './puzzles/reviveStructures.js';
-import { colorForIndex } from './net/playerColors.js';
 import { layoutMode, isMobile, onLayoutChange } from './ui/layoutMode.js';
 
+import { dateStrKST, shiftDateStr, msUntilNextKSTMidnight, formatCountdown } from './daily/dateUtil.js';
+import {
+  DAILY_LIMIT_MS, loadProgress, saveProgress, patchProgressCells,
+  recordResult, summarize, DIST_BUCKETS,
+} from './daily/storage.js';
+import { ELEMENT_INFO } from './daily/elementInfo.js';
+import { buildShareText, buildShareGrid } from './daily/share.js';
+
 const svg          = document.getElementById('sudoku-svg');
-const drawOverlay  = document.getElementById('draw-overlay');
 const boardPanel   = document.getElementById('board-panel');
 const keypadPanel  = document.getElementById('keypad-panel');
 const keypadGrid   = document.getElementById('keypad-grid');
 const kpToggle     = document.getElementById('kp-toggle');
 const btnResetAll  = document.getElementById('btn-reset-all');
-const btnResetMine = document.getElementById('btn-reset-mine');
 const btnClearMyNotes = document.getElementById('btn-clear-my-notes');
-const btnToggleDraw = document.getElementById('btn-toggle-draw');
-const btnClearDraw  = document.getElementById('btn-clear-draw');
 const toast        = document.getElementById('toast');
 const generateStatus = document.getElementById('generate-status');
 
@@ -38,19 +41,15 @@ const confirmText    = document.getElementById('confirm-text');
 const confirmOk      = document.getElementById('confirm-ok');
 const confirmCancel  = document.getElementById('confirm-cancel');
 
-const btnOpenPuzzle   = document.getElementById('btn-open-puzzle');
 const btnOpenGenerate = document.getElementById('btn-open-generate');
 const btnOpenSave     = document.getElementById('btn-open-save');
 const btnOpenHelp     = document.getElementById('btn-open-help');
-const puzzlePanel     = document.getElementById('puzzle-panel');
 const generatePanel   = document.getElementById('generate-panel');
 const savePanel       = document.getElementById('save-panel');
 const helpPanel       = document.getElementById('help-panel');
-const puzzleClose     = document.getElementById('puzzle-close');
 const generateClose   = document.getElementById('generate-close');
 const saveClose       = document.getElementById('save-close');
 const helpClose       = document.getElementById('help-close');
-const puzzleList      = document.getElementById('puzzle-list');
 const genShapeGroup      = document.getElementById('gen-shape-group');
 const genElementGroup    = document.getElementById('gen-element-group');
 const genDifficultyGroup = document.getElementById('gen-difficulty-group');
@@ -71,103 +70,65 @@ const btnToggleDarkMode  = document.getElementById('btn-toggle-dark-mode');
 
 const landingScreen      = document.getElementById('landing-screen');
 const gameScreen         = document.getElementById('game-screen');
-const landingMain        = document.getElementById('landing-main');
-const landingMulti       = document.getElementById('landing-multi');
-const landingCreate      = document.getElementById('landing-create');
-const landingJoin        = document.getElementById('landing-join');
-const btnLandingSingle   = document.getElementById('btn-landing-single');
-const btnLandingMulti    = document.getElementById('btn-landing-multi');
-const btnMpCreate        = document.getElementById('btn-mp-create');
-const btnMpJoin          = document.getElementById('btn-mp-join');
-const btnMpBack          = document.getElementById('btn-mp-back');
+const landingDate        = document.getElementById('landing-date');
+const btnDailyStandard   = document.getElementById('btn-daily-standard');
+const btnDailyExtended   = document.getElementById('btn-daily-extended');
+const dailyLoadNote      = document.getElementById('daily-load-note');
+const dailyErrorEl       = document.getElementById('daily-error');
+const btnFreePlay        = document.getElementById('btn-free-play');
+const btnLandingStats    = document.getElementById('btn-landing-stats');
+const btnLandingDark     = document.getElementById('btn-landing-dark');
 const btnGoLanding       = document.getElementById('btn-go-landing');
 
-const lcNickname    = document.getElementById('lc-nickname');
-const lcModeBattle  = document.getElementById('lc-mode-battle');
-const lcModeCoop    = document.getElementById('lc-mode-coop');
-const lcMaxPlayers  = document.getElementById('lc-max-players');
-const lcShapeGroup      = document.getElementById('lc-shape-group');
-const lcElementGroup    = document.getElementById('lc-element-group');
-const lcDifficultyGroup = document.getElementById('lc-difficulty-group');
-const lcError       = document.getElementById('lc-error');
-const btnLcSubmit   = document.getElementById('btn-lc-submit');
-const btnLcBack     = document.getElementById('btn-lc-back');
+const elementSidebar     = document.getElementById('element-sidebar');
+const elementSidebarHandle = document.getElementById('element-sidebar-handle');
+const elementSidebarIcons  = document.getElementById('element-sidebar-icons');
+const elementSidebarList   = document.getElementById('element-sidebar-list');
 
-const ljNickname   = document.getElementById('lj-nickname');
-const ljCode       = document.getElementById('lj-code');
-const ljError      = document.getElementById('lj-error');
-const btnLjSubmit  = document.getElementById('btn-lj-submit');
-const btnLjBack    = document.getElementById('btn-lj-back');
+const dailyResultModal   = document.getElementById('daily-result-modal');
+const dailyResultTitle   = document.getElementById('daily-result-title');
+const dailyResultDetail  = document.getElementById('daily-result-detail');
+const dailyResultGrid    = document.getElementById('daily-result-grid');
+const btnDailyResultShare = document.getElementById('btn-daily-result-share');
+const btnDailyResultStats = document.getElementById('btn-daily-result-stats');
+const btnDailyResultClose = document.getElementById('btn-daily-result-close');
+const dailyShareNote     = document.getElementById('daily-share-note');
 
-const waitingRoomScreen = document.getElementById('waiting-room-screen');
-const wrCode            = document.getElementById('wr-code');
-const wrPlayerList      = document.getElementById('wr-player-list');
-const wrModeBattle      = document.getElementById('wr-mode-battle');
-const wrModeCoop        = document.getElementById('wr-mode-coop');
-const wrMaxPlayers      = document.getElementById('wr-max-players');
-const wrShapeGroup      = document.getElementById('wr-shape-group');
-const wrElementGroup    = document.getElementById('wr-element-group');
-const wrDifficultyGroup = document.getElementById('wr-difficulty-group');
-const wrReadonlyNote    = document.getElementById('wr-readonly-note');
-const wrBody            = document.getElementById('wr-body');
-const wrStarting        = document.getElementById('wr-starting');
-const wrError           = document.getElementById('wr-error');
-const btnWrStart        = document.getElementById('btn-wr-start');
-const wrWaitingNote     = document.getElementById('wr-waiting-note');
-const btnWrLeave        = document.getElementById('btn-wr-leave');
-const btnWrCopyCode     = document.getElementById('btn-wr-copy-code');
+const dailyStatsModal    = document.getElementById('daily-stats-modal');
+const dailyStatsClose    = document.getElementById('daily-stats-close');
+const statPlayed         = document.getElementById('stat-played');
+const statWinRate        = document.getElementById('stat-winrate');
+const statStreak         = document.getElementById('stat-streak');
+const statMaxStreak      = document.getElementById('stat-maxstreak');
+const dailyStatsDist     = document.getElementById('daily-stats-dist');
+const dailyNextCountdown  = document.getElementById('daily-next-countdown');
+const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
+const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
-const battleLeaderboard      = document.getElementById('battle-leaderboard');
-const battleLeaderboardCode  = document.getElementById('battle-leaderboard-code');
-const battleLeaderboardList  = document.getElementById('battle-leaderboard-list');
-const battleCountdownOverlay = document.getElementById('battle-countdown-overlay');
-const battleCountdownNumber  = document.getElementById('battle-countdown-number');
-const battleEndedOverlay    = document.getElementById('battle-ended-overlay');
-const battleEndedList       = document.getElementById('battle-ended-list');
-const btnBattleEndedContinue = document.getElementById('btn-battle-ended-continue');
+const SITE_URL = 'https://nuclyee72.github.io/Adv_Sudoku_Maker/';
 
-const coopLeaderboard     = document.getElementById('coop-leaderboard');
-const coopLeaderboardCode = document.getElementById('coop-leaderboard-code');
-const coopLeaderboardList = document.getElementById('coop-leaderboard-list');
-const coopEndedOverlay = document.getElementById('coop-ended-overlay');
-const coopEndedList    = document.getElementById('coop-ended-list');
-const coopEndedTime    = document.getElementById('coop-ended-time');
-const btnCoopEndedContinue = document.getElementById('btn-coop-ended-continue');
-
-const btnCoopStopVote     = document.getElementById('btn-coop-stop-vote');
-const coopVotePanel       = document.getElementById('coop-vote-panel');
-const coopVoteClose       = document.getElementById('coop-vote-close');
-const coopVoteList        = document.getElementById('coop-vote-list');
-const btnCoopVoteAgree    = document.getElementById('btn-coop-vote-agree');
-const btnCoopVoteDisagree = document.getElementById('btn-coop-vote-disagree');
-
-// renderer.onCellSelect(아래)가 참조하므로, renderer.selectFirstCell()이 모듈 초기화 중
-// 동기적으로 처음 호출되기 전에 반드시 선언돼 있어야 한다(TDZ 방지).
-let mp = null;          // { code, token, isHost, socket } - 멀티플레이 세션 상태
-let coopActive = false; // 지금 협동 게임 화면에 들어와 있는지
-
-// ── 보드 조립 ──
-const initialPuzzle = PUZZLES.find((p) => p.id === 'test_overlap4') || PUZZLES[0];
-let activePuzzleId = initialPuzzle.id;
-
+// ── 보드 조립 (빈 9x9 스타터 — 실제 퍼즐은 데일리/자유 연습에서 mountBoard로 갈아끼움) ──
 let board = new Board();
-board.addStructures(initialPuzzle.structures);
-board.loadGivens(initialPuzzle.givens);
+board.addStructures(createStandardSudokuStructures(0, 0));
 
 const renderer = new BoardRenderer(svg, board);
 
-// ── 답지 (정답 체크 / 정답 보기): 현재 퍼즐의 structures/givens/(있다면) 정답을 기억해뒀다가,
-// 처음 클릭되는 시점에 한 번만 준비한다(안 쓰면 계산 자체가 아예 안 일어남).
-let currentPuzzleStructures = initialPuzzle.structures;
-let currentPuzzleGivens = initialPuzzle.givens;
-let currentPuzzleSolution = initialPuzzle.solution ?? null; // 생성기가 내려준 [{row,col,value}] - 레거시 수록 퍼즐엔 없음
-let cachedSolution = null;   // "r,c" -> value Map, 준비 완료 후 캐싱(같은 퍼즐 안에서 재사용)
-let solvingPromise = null;   // solveBoard 계산 도중 중복 호출 방지용(정답이 미리 없는 경우에만 씀)
+// 데일리 상태 — renderer.onCellSelect가 모듈 초기화 중 동기적으로 처음 불릴 때 참조하므로
+// (renderer.selectFirstCell), 그 전에 반드시 선언돼 있어야 한다(TDZ 방지).
+let dailyData = null;
+let dailyDataDate = null;
+let dailyRun = null;       // { date, variant, elements, shape, solutionMap, deadlineTs, startedAt, ended }
+let dailyCountdownRAF = null;
+let dailyPersistTimer = null;
+
+// ── 답지 (정답 체크 / 정답 보기) 상태 ──
+let currentPuzzleStructures = board.structures;
+let currentPuzzleGivens = [];
+let currentPuzzleSolution = null; // [{row,col,value}] — 생성기/데일리 JSON이 내려준 정답
+let cachedSolution = null;        // "r,c" -> value Map
+let solvingPromise = null;
 
 // ── 초기 배치: 화면에 맞게 축소 후 중앙 정렬 ──
-// 세로 모바일은 키패드가 하단 바로, 가로 모바일은 오른쪽에 전체 높이로 고정 도킹되므로(CSS,
-// [data-layout="mobile-portrait"/"mobile-landscape"]), 그 실측 크기만큼 뺀 나머지 영역을
-// 기준으로 맞춘다. 데스크톱은 기존 공식을 그대로 쓴다.
 function fitAndCenterBoard() {
   const naturalW = parseFloat(svg.getAttribute('width'))  || 0;
   const naturalH = parseFloat(svg.getAttribute('height')) || 0;
@@ -177,9 +138,7 @@ function fitAndCenterBoard() {
     const availW = window.innerWidth * 0.92;
     const availH = Math.max(120, window.innerHeight - kpH - 24);
     const fit = Math.min(1, availW / naturalW, availH / naturalH);
-
     renderer.setScale(fit);
-
     const scaledW = naturalW * fit;
     const scaledH = naturalH * fit;
     boardPanel.style.left = `${Math.round((window.innerWidth - scaledW) / 2)}px`;
@@ -192,9 +151,7 @@ function fitAndCenterBoard() {
     const availW = Math.max(120, window.innerWidth - kpW - 16);
     const availH = window.innerHeight * 0.94;
     const fit = Math.min(1, availW / naturalW, availH / naturalH);
-
     renderer.setScale(fit);
-
     const scaledW = naturalW * fit;
     const scaledH = naturalH * fit;
     boardPanel.style.left = `${Math.round((window.innerWidth - kpW - scaledW) / 2)}px`;
@@ -205,23 +162,13 @@ function fitAndCenterBoard() {
   const availW = window.innerWidth * 0.6;
   const availH = window.innerHeight * 0.86;
   const fit = Math.min(1, availW / naturalW, availH / naturalH);
-
-  renderer.setScale(fit); // wrapper 히트박스도 함께 축소된 크기로 동기화됨
-
+  renderer.setScale(fit);
   const scaledW = naturalW * fit;
   const scaledH = naturalH * fit;
   boardPanel.style.left = `${Math.round((window.innerWidth - scaledW) / 2 - 130)}px`;
   boardPanel.style.top  = `${Math.round((window.innerHeight - scaledH) / 2)}px`;
 }
-// 최초 호출(아래)은 #keypad-grid에 실제 버튼이 채워진 뒤(new Keypad(...) 이후)로 미룬다.
-// 그래도 이 시점엔 #game-screen이 아직 랜딩 화면에 가려 display:none이라(싱글/멀티 상관없이
-// enterGame() 전까진 항상 그렇다) 세로 모바일 분기가 재는 키패드 바 높이는 여전히 0으로
-// 나온다(hidden 조상 아래 요소는 getBoundingClientRect가 전부 0) - 화면이 실제로 보이는
-// 순간(enterGame())에 한 번 더 불러서 그때 바로잡는다.
 
-// 모바일에서는 키패드 위치를 CSS([data-layout="mobile-portrait"] 등)가 전담하므로 인라인
-// left/top을 아예 남기지 않는다 - 남아있으면 나중에 데스크톱 폭으로 돌아왔을 때도 그대로
-// 남아 새 CSS와 다툴 수 있다.
 function layoutKeypad() {
   if (isMobile()) {
     keypadPanel.style.left = '';
@@ -233,12 +180,7 @@ function layoutKeypad() {
 }
 layoutKeypad();
 
-// 저장/도움말/퍼즐선택/자동생성/답지/협동중지투표 — 전부 .floating-panel 구조를 공유하고,
-// 데스크톱에서는 openFloatingPanel()이 인라인 left/top으로(최초 1회) 중앙 배치한 뒤 드래그로
-// 옮긴 위치가 남아있을 수 있다. 레이아웃 전환 시 그 인라인 값을 지워야 모바일 시트 CSS가
-// 온전히 위치를 맡고, 나중에 데스크톱으로 돌아왔을 때도 openFloatingPanel()이 새로 중앙
-// 좌표를 계산한다(dataset.positioned도 같이 지워야 "이미 배치됨"으로 오인하지 않는다).
-const FLOATING_PANELS = [savePanel, helpPanel, puzzlePanel, generatePanel, coopVotePanel, answerSheetPanel];
+const FLOATING_PANELS = [savePanel, helpPanel, generatePanel, answerSheetPanel];
 function clearFloatingPanelPositions() {
   for (const panel of FLOATING_PANELS) {
     panel.style.left = '';
@@ -247,8 +189,6 @@ function clearFloatingPanelPositions() {
   }
 }
 
-// 레이아웃 모드가 실제로 바뀔 때만(리사이즈/방향전환) 키패드/플로팅 패널 위치와 보드 맞춤을
-// 다시 계산한다.
 onLayoutChange(() => {
   layoutKeypad();
   clearFloatingPanelPositions();
@@ -257,27 +197,26 @@ onLayoutChange(() => {
 
 // ── 드래그 패널 ──
 const boardDrag = new DragPanel(boardPanel, boardPanel, {
-  allowSVG: true,     // 게임 판(SVG 셀)을 잡아도 이동됨
-  clamp: 'partial',   // 최소 한 칸만 보이면 화면 밖으로 나갈 수 있음
+  allowSVG: true,
+  clamp: 'partial',
   minVisible: 56,
-  contentEl: svg,      // 확대된 실제 크기를 기준으로 이동 범위 계산
-  noZBoost: true,      // 게임 판을 클릭해도 키패드 패널보다 위로 올라오지 않음
+  contentEl: svg,
+  noZBoost: true,
 });
-renderer.boardDrag = boardDrag; // 드래그 직후 클릭에 의한 오선택 방지
+renderer.boardDrag = boardDrag;
 
 new DragPanel(keypadPanel, keypadPanel, { clamp: 'full', desktopOnly: true });
 
-renderer.setupWheel(boardPanel); // 마우스 커서 기준 부드러운 휠 줌
-renderer.setupPinchZoom(boardPanel); // 두 손가락 핀치 줌 (boardDrag 등록 이후에 호출해야 함 - BoardRenderer.setupPinchZoom 주석 참고)
-renderer.bindExternalDrawSurface(drawOverlay); // 그리기 모드일 때 게임판 밖에서도 그리기를 시작할 수 있게
+renderer.setupWheel(boardPanel);
+renderer.setupPinchZoom(boardPanel);
 
-// ── 추가 메뉴 열기/닫기 (본 키패드는 그대로 두고, 왼쪽에 별도 메뉴가 펼쳐짐) ──
+// ── 추가 메뉴 열기/닫기 ──
 kpToggle.addEventListener('click', () => {
   const open = keypadPanel.classList.toggle('menu-open');
   kpToggle.textContent = open ? '›' : '‹';
 });
 
-// ── 메모 모드 (Lshift 또는 메모 버튼으로 토글) ──
+// ── 메모 모드 ──
 function toggleNoteMode() {
   renderer.noteMode = !renderer.noteMode;
   keypad.setNoteMode(renderer.noteMode);
@@ -290,33 +229,15 @@ const keypad = new Keypad(
   () => { if (!boardLocked) toggleNoteMode(); },
   () => { if (!boardLocked) renderer.undo(); },
 );
-fitAndCenterBoard(); // #keypad-grid가 채워진 뒤에야 세로 모바일의 키패드 바 높이를 정확히 잴 수 있음
+fitAndCenterBoard();
 
 renderer.onCellSelect = (row, col) => {
   const cell = board.getCell(row, col);
   keypad.highlightValue(cell?.value ?? null);
-  if (coopActive && mp?.socket) roomClient.sendCoopCursor(mp.socket, { row, col });
+  scheduleDailyPersist();
 };
 
 renderer.selectFirstCell();
-
-// ── 그리기 (E 또는 그리기 버튼으로 토글, 협동 모드에선 다른 참가자에게도 보임) ──
-function toggleDrawMode() {
-  renderer.setDrawMode(!renderer.drawMode);
-  btnToggleDraw.classList.toggle('active', renderer.drawMode);
-}
-btnToggleDraw.addEventListener('click', () => { if (!boardLocked) toggleDrawMode(); });
-btnClearDraw.addEventListener('click', () => {
-  if (boardLocked) return;
-  renderer.clearAllStrokes();
-  if (coopActive && mp?.socket) roomClient.sendCoopDrawClear(mp.socket);
-});
-renderer.onStrokeAdded = (stroke) => {
-  if (coopActive && mp?.socket) roomClient.sendCoopDraw(mp.socket, stroke);
-};
-renderer.onStrokeRemoved = (strokeId) => {
-  if (coopActive && mp?.socket) roomClient.sendCoopDrawUndo(mp.socket, strokeId);
-};
 
 // ── 떠있는 패널 공통 열기/닫기 ──
 function openPanel(panel) { panel.classList.add('show'); }
@@ -324,16 +245,11 @@ function closePanel(panel) { panel.classList.remove('show'); }
 function isFloatingPanelOpen() {
   return savePanel.classList.contains('show')
     || helpPanel.classList.contains('show')
-    || puzzlePanel.classList.contains('show')
     || generatePanel.classList.contains('show')
-    || coopVotePanel.classList.contains('show')
     || answerSheetPanel.classList.contains('show');
 }
 
-/** 저장/도움말/퍼즐 선택 패널 — 최초로 열릴 때만 화면 중앙 좌표를 계산해 배치, 이후엔 드래그로 옮긴 위치 유지 */
 function openFloatingPanel(panel) {
-  // 모바일에서는 CSS([data-layout^="mobile"] .floating-panel)가 하단 시트로 위치를
-  // 전담하므로 중앙 좌표 계산을 건너뛴다(desktopOnly라 어차피 드래그도 안 됨).
   if (isMobile()) { openPanel(panel); return; }
   if (!panel.dataset.positioned) {
     const r = panel.getBoundingClientRect();
@@ -346,67 +262,40 @@ function openFloatingPanel(panel) {
 
 new DragPanel(savePanel, savePanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
 new DragPanel(helpPanel, helpPanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
-new DragPanel(puzzlePanel, puzzlePanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
 new DragPanel(generatePanel, generatePanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
-new DragPanel(coopVotePanel, coopVotePanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
 new DragPanel(answerSheetPanel, answerSheetPanel, { clamp: 'partial', minVisible: 40, desktopOnly: true });
 
-// ── 확인 모달 (모두 지우기 / 불러오기 / 퍼즐 변경 등 공용) ──
+// ── 확인 모달 ──
 let pendingConfirmAction = null;
-
 function openConfirmModal() { openPanel(confirmModal); }
 function closeConfirmModal() { closePanel(confirmModal); }
-
 function askConfirm(message, onConfirm) {
   confirmText.innerHTML = message;
   pendingConfirmAction = onConfirm;
   openConfirmModal();
 }
-
 function runPendingConfirm() {
   const action = pendingConfirmAction;
   pendingConfirmAction = null;
   closeConfirmModal();
   if (action) action();
 }
-
 function cancelConfirm() {
   pendingConfirmAction = null;
   closeConfirmModal();
 }
-
 confirmOk.addEventListener('click', runPendingConfirm);
 confirmCancel.addEventListener('click', cancelConfirm);
 confirmModal.addEventListener('click', (e) => {
-  if (e.target === confirmModal) cancelConfirm(); // 배경 클릭 시 취소
+  if (e.target === confirmModal) cancelConfirm();
 });
 
-/**
- * 협동 모드 "지우기" 계열 버튼 공용: 값은 coopLoad(value:null)로 서버에 보내 전원에게
- * 브로드캐스트되게 하고(다른 값 입력과 동일한 "서버 확정 후 반영" 경로 - handleRoomPush가
- * 이미 roomState push마다 coopCells를 재적용하므로 별도 로컬 반영 코드가 필요 없다),
- * 메모는 서버가 아예 모르는 로컬 전용 값이라 여기서 직접 지운다.
- */
-async function coopClearCells(cells) {
-  if (!mp || !cells.length) return;
-  for (const { row, col } of cells) board.getCell(row, col)?.candidates.clear();
-  renderer.refresh();
-  await roomClient.coopLoad(mp.code, mp.token, {
-    cells: cells.map((c) => ({ row: c.row, col: c.col, value: null })),
-  });
-}
-
+// ── 모두 지우기 / 메모 지우기 ──
 btnResetAll.addEventListener('click', () => {
   if (boardLocked) return;
   btnResetAll.classList.add('pressed');
   setTimeout(() => btnResetAll.classList.remove('pressed'), 130);
-  if (coopActive) {
-    const cells = board.getVisibleCells().filter((c) => !c.isGiven && c.value !== null);
-    if (!cells.length) return;
-    askConfirm('입력한 숫자를 모두 지울까요?<br/>모든 참가자의 보드가 함께 지워집니다.', () => coopClearCells(cells));
-  } else {
-    askConfirm('입력한 숫자를 모두 지울까요?<br/>초기 제공 숫자는 유지됩니다.', () => renderer.resetBoard());
-  }
+  askConfirm('입력한 숫자를 모두 지울까요?<br/>초기 제공 숫자는 유지됩니다.', () => renderer.resetBoard());
 });
 
 btnClearMyNotes.addEventListener('click', () => {
@@ -416,18 +305,7 @@ btnClearMyNotes.addEventListener('click', () => {
   renderer.clearAllNotes();
 });
 
-btnResetMine.addEventListener('click', () => {
-  if (boardLocked || !coopActive) return;
-  btnResetMine.classList.add('pressed');
-  setTimeout(() => btnResetMine.classList.remove('pressed'), 130);
-  const myId = lastRoomState?.you?.id;
-  const cells = board.getVisibleCells()
-    .filter((c) => !c.isGiven && c.value !== null && coopCellOwners.get(`${c.row},${c.col}`) === myId);
-  if (!cells.length) return;
-  askConfirm('내가 입력한 숫자만 지울까요?', () => coopClearCells(cells));
-});
-
-// ── 답지 (정답 체크 / 정답 보기) — 싱글플레이·협동 전용, 배틀에선 숨김(enterBattleGame/exitBattleUI) ──
+// ── 답지 (정답 체크 / 정답 보기) — 자유 연습 전용, 데일리에선 숨김 ──
 function toggleAnswerSheetPanel() {
   if (answerSheetPanel.classList.contains('show')) closePanel(answerSheetPanel);
   else openFloatingPanel(answerSheetPanel);
@@ -435,11 +313,6 @@ function toggleAnswerSheetPanel() {
 btnOpenAnswerSheet.addEventListener('click', toggleAnswerSheetPanel);
 answerSheetClose.addEventListener('click', () => closePanel(answerSheetPanel));
 
-/**
- * 같은 퍼즐 안에서는 한 번만 준비해 재사용한다. 생성기가 정답을 함께 내려준 퍼즐은
- * (배열 → Map 변환만 하면 되므로) 즉시 끝나고, 레거시 수록 퍼즐처럼 정답이 없는 경우에만
- * solveBoard로 지연 계산한다.
- */
 function ensureSolution() {
   if (cachedSolution) return Promise.resolve(cachedSolution);
   if (currentPuzzleSolution) {
@@ -460,16 +333,14 @@ function showAnswerError() {
   setTimeout(() => generateStatus.classList.remove('show'), 2400);
 }
 
-/** 계산 중 중복 클릭을 막기 위해 두 버튼 다 잠깐 비활성화하고 라벨을 바꿔둔다 */
 async function runWithAnswerButtonsBusy(btn, busyText, fn) {
   const otherBtn = btn === btnAnswerCheck ? btnAnswerReveal : btnAnswerCheck;
   const prevText = btn.textContent;
   btn.disabled = true;
   otherBtn.disabled = true;
   btn.textContent = busyText;
-  try {
-    await fn();
-  } finally {
+  try { await fn(); }
+  finally {
     btn.disabled = false;
     otherBtn.disabled = false;
     btn.textContent = prevText;
@@ -478,48 +349,33 @@ async function runWithAnswerButtonsBusy(btn, busyText, fn) {
 
 btnAnswerCheck.addEventListener('click', () => {
   if (boardLocked) return;
-  const message = coopActive
-    ? '입력한 숫자를 정답과 비교해서 맞는 칸을 고정할까요?<br/>모든 참가자의 보드에 함께 반영됩니다. (턴테이블 제외)'
-    : '입력한 숫자를 정답과 비교해서 맞는 칸을 고정할까요?<br/>맞는 칸은 더 이상 수정할 수 없어요. (턴테이블 제외)';
-  askConfirm(message, () => runWithAnswerButtonsBusy(btnAnswerCheck, '확인 중...', async () => {
-    if (coopActive) {
-      if (mp?.socket) roomClient.sendCoopAnswerCheck(mp.socket);
+  askConfirm('입력한 숫자를 정답과 비교해서 맞는 칸을 고정할까요?<br/>맞는 칸은 더 이상 수정할 수 없어요. (턴테이블 제외)',
+    () => runWithAnswerButtonsBusy(btnAnswerCheck, '확인 중...', async () => {
+      const solution = await ensureSolution();
+      if (!solution) { showAnswerError(); return; }
+      renderer.lockCorrectCells(solution);
       closePanel(answerSheetPanel);
-      return;
-    }
-    const solution = await ensureSolution();
-    if (!solution) { showAnswerError(); return; }
-    renderer.lockCorrectCells(solution);
-    closePanel(answerSheetPanel);
-  }));
+    }));
 });
 
 btnAnswerReveal.addEventListener('click', () => {
   if (boardLocked) return;
-  const message = coopActive
-    ? '정답을 채울까요?<br/>모든 참가자의 보드에 함께 반영되고, 직접 입력한 것처럼 이후에도 수정할 수 있어요. (턴테이블 제외)'
-    : '정답을 채울까요?<br/>직접 입력한 것처럼 채워지고, 이후에도 수정할 수 있어요. (턴테이블 제외)';
-  askConfirm(message, () => runWithAnswerButtonsBusy(btnAnswerReveal, '채우는 중...', async () => {
-    if (coopActive) {
-      if (mp?.socket) roomClient.sendCoopAnswerReveal(mp.socket);
+  askConfirm('정답을 채울까요?<br/>직접 입력한 것처럼 채워지고, 이후에도 수정할 수 있어요. (턴테이블 제외)',
+    () => runWithAnswerButtonsBusy(btnAnswerReveal, '채우는 중...', async () => {
+      const solution = await ensureSolution();
+      if (!solution) { showAnswerError(); return; }
+      renderer.revealAnswers(solution);
       closePanel(answerSheetPanel);
-      return;
-    }
-    const solution = await ensureSolution();
-    if (!solution) { showAnswerError(); return; }
-    renderer.revealAnswers(solution);
-    closePanel(answerSheetPanel);
-  }));
+    }));
 });
 
-// ── 저장 / 불러오기 ──
+// ── 저장 / 불러오기 (자유 연습 전용) ──
 const SAVE_KEY_PREFIX = 'adv-sudoku-save-';
 const slotKey = (n) => `${SAVE_KEY_PREFIX}${n}`;
 
 function clearAllSaveSlots() {
   for (let n = 1; n <= 3; n++) localStorage.removeItem(slotKey(n));
 }
-
 function refreshSaveSlots() {
   document.querySelectorAll('.load-btn').forEach((btn) => {
     const has = !!localStorage.getItem(slotKey(btn.dataset.slot));
@@ -527,13 +383,11 @@ function refreshSaveSlots() {
     btn.textContent = has ? '불러오기' : '비어있음';
   });
 }
-
 function toggleSavePanel() {
   if (savePanel.classList.contains('show')) { closePanel(savePanel); return; }
   refreshSaveSlots();
   openFloatingPanel(savePanel);
 }
-
 function toggleHelpPanel() {
   if (helpPanel.classList.contains('show')) closePanel(helpPanel);
   else openFloatingPanel(helpPanel);
@@ -555,92 +409,34 @@ document.querySelectorAll('.load-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const raw = localStorage.getItem(slotKey(btn.dataset.slot));
     if (!raw) return;
-    const message = coopActive
-      ? `슬롯 ${btn.dataset.slot}을 불러올까요?<br/>모든 참가자의 보드가 함께 바뀝니다.`
-      : `슬롯 ${btn.dataset.slot}을 불러올까요?<br/>현재 진행 상황은 사라집니다.`;
-    askConfirm(message, async () => {
+    askConfirm(`슬롯 ${btn.dataset.slot}을 불러올까요?<br/>현재 진행 상황은 사라집니다.`, () => {
       try {
-        const data = JSON.parse(raw);
-        if (coopActive) {
-          if (!mp) return;
-          // 로컬로 바로 반영하지 않고 서버에 보내 검증/반영시킨 뒤, 그 결과가 roomState push로
-          // 돌아오면 그때 화면에 반영된다(다른 값 입력/회전과 동일한 "서버 확정 후 반영" 원칙).
-          await roomClient.coopLoad(mp.code, mp.token, {
-            cells: data.map((c) => ({ row: c.row, col: c.col, value: c.value })),
-          });
-        } else {
-          board.loadSerialized(data);
-          renderer.refresh();
-        }
+        board.loadSerialized(JSON.parse(raw));
+        renderer.refresh();
         closePanel(savePanel);
-      } catch (err) {
-        console.error(err);
-        // 저장된 데이터가 손상됐거나 서버 요청 실패 - 조용히 무시
-      }
+      } catch (err) { console.error(err); }
     });
   });
 });
 
-// ── 퍼즐 선택 ──
-/**
- * structures/givens로 새 Board를 만들어 렌더러에 장착한다 (싱글플레이/배틀/협동 공용).
- * 이전 보드 구조 기준으로 저장된 로컬 세이브 슬롯은 새 보드의 칸 배치와 맞지 않을 수 있으므로
- * (row/col은 같아도 isGiven 등이 달라 그대로 불러오면 깨짐) 매번 새 보드를 장착할 때 비워준다.
- */
+// ── 퍼즐 장착 (자유 연습/데일리 공용) ──
 function mountBoard(structures, givens) {
   board = new Board();
   board.addStructures(structures);
   board.loadGivens(givens);
-  renderer.loadBoard(board); // 내부에서 그리기 모드/획을 초기화하므로 버튼 표시도 맞춰서 끈다
-  btnToggleDraw.classList.remove('active');
+  renderer.loadBoard(board);
   fitAndCenterBoard();
   renderer.selectFirstCell();
   clearAllSaveSlots();
-  refreshSaveSlots(); // 세이브 패널이 이미 열려있어도 즉시 "비어있음"으로 반영
+  refreshSaveSlots();
 
   currentPuzzleStructures = structures;
   currentPuzzleGivens = givens;
-  currentPuzzleSolution = null; // 필요하면 호출 쪽(loadPuzzle 등)이 직접 채워넣는다
+  currentPuzzleSolution = null;
   cachedSolution = null;
   solvingPromise = null;
   closePanel(answerSheetPanel);
 }
-
-function loadPuzzle(puzzle) {
-  mountBoard(puzzle.structures, puzzle.givens);
-  // 생성기가 함께 내려준 정답이 있으면 그대로 쓰고(재계산 불필요, 턴테이블 자유도로 인한
-  // 오답 위험 없음), 없으면(레거시 수록 퍼즐) 클릭 시점에 solveBoard로 지연 계산한다.
-  currentPuzzleSolution = puzzle.solution ?? null;
-  activePuzzleId = puzzle.id;
-  closePanel(puzzlePanel);
-  if (timerEnabled) armTimer(); // 타이머 켜져있으면 새 퍼즐도 "시작" 누르기 전까지 잠금
-}
-
-function renderPuzzleList() {
-  puzzleList.innerHTML = '';
-  for (const p of PUZZLES) {
-    const isActive = p.id === activePuzzleId;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'puzzle-item' + (isActive ? ' active' : '');
-    btn.textContent = isActive ? `${p.name}  ✓` : p.name;
-    if (!isActive) {
-      btn.addEventListener('click', () => {
-        askConfirm(`'${p.name}'(으)로 바꿀까요?<br/>저장된 슬롯이 모두 초기화됩니다.`, () => loadPuzzle(p));
-      });
-    }
-    puzzleList.appendChild(btn);
-  }
-}
-
-function togglePuzzlePanel() {
-  if (puzzlePanel.classList.contains('show')) { closePanel(puzzlePanel); return; }
-  renderPuzzleList();
-  openFloatingPanel(puzzlePanel);
-}
-
-btnOpenPuzzle.addEventListener('click', togglePuzzlePanel);
-puzzleClose.addEventListener('click', () => closePanel(puzzlePanel));
 
 // ── 자동 생성: 모양/요소/난이도 선택기 ──
 function createPickerState() {
@@ -651,7 +447,6 @@ function createPickerState() {
   };
 }
 
-/** 모양 id에 맞는 미니 미리보기 노드('랜덤'은 보드 배치가 없으므로 주사위 이모지로 대신한다) */
 function buildShapeThumb(shapeId) {
   const shape = getShape(shapeId);
   if (!shape) {
@@ -663,10 +458,6 @@ function buildShapeThumb(shapeId) {
   return renderShapeThumb(shape);
 }
 
-/**
- * 모양 선택기 — 클릭하면 펼쳐지는 커스텀 드롭다운으로, 각 보기를 보드 배치 미니어처와 함께 보여준다.
- * 문서 전체에 걸린 outside-click 리스너(closeAllShapePickers 참고)가 바깥 클릭 시 닫아준다.
- */
 function renderShapeGroup(container, options, selectedId, disabled, onSelect) {
   container.innerHTML = '';
   const selected = options.find(o => o.id === selectedId) ?? options[0];
@@ -720,12 +511,6 @@ document.addEventListener('click', (e) => {
   closeAllShapePickers();
 });
 
-/**
- * N개 옵션 위를 미끄러지듯 움직이는 thumb가 달린 트랙 하나를 만든다 — 요소별 없음/보통/
- * 많음 슬라이더와 난이도 5단 슬라이더가 이 하나의 구현을 공유한다. 실제 드래그가 아니라
- * 클릭으로 값을 바꾸지만, 값이 바뀔 때 thumb가 옆 칸으로 미끄러지듯 움직여서(transform
- * transition) 슬라이더 조작감을 낸다.
- */
 function buildSlideTrack(labels, selectedIndex, disabled, onSelectIndex) {
   const track = document.createElement('div');
   track.className = 'element-slider-track';
@@ -751,7 +536,6 @@ function buildSlideTrack(labels, selectedIndex, disabled, onSelectIndex) {
   return track;
 }
 
-/** 요소마다 없음/보통/많음 3단 슬라이더 한 줄 + 맨 아래 "랜덤" 토글. */
 function renderElementGroup(container, elements, disabled, onSetAmount, onToggleRandom) {
   container.innerHTML = '';
   for (const key of ELEMENT_KEYS) {
@@ -781,7 +565,6 @@ function renderElementGroup(container, elements, disabled, onSetAmount, onToggle
   container.appendChild(randomBtn);
 }
 
-/** 난이도 1~5단 슬라이더 한 줄 — 요소 슬라이더와 같은 트랙 구현을 옆 라벨 없이 폭 100%로 쓴다. */
 function renderDifficultySlider(container, level, disabled, onSetLevel) {
   container.innerHTML = '';
   const track = buildSlideTrack(
@@ -793,10 +576,6 @@ function renderDifficultySlider(container, level, disabled, onSetLevel) {
 
 const SHAPE_OPTIONS = [...GENERATE_SHAPES.map(s => ({ id: s.id, label: s.label })), { id: 'random', label: '랜덤' }];
 
-/**
- * 모양/요소/난이도 3그룹을 컨테이너에 그려주는 선택기. onChange는 사람이 버튼을 눌러
- * 값을 바꿨을 때만 불린다(setState로 서버 상태를 반영할 때는 안 불림 - 무한 루프 방지).
- */
 function createPicker({ shapeEl, elementEl, difficultyEl, onChange = () => {} }) {
   const state = createPickerState();
   let disabled = false;
@@ -830,7 +609,9 @@ async function runGenerate(template) {
   generateStatus.classList.add('show');
   try {
     const puzzle = await generatePuzzle(template);
-    loadPuzzle(puzzle);
+    mountBoard(puzzle.structures, puzzle.givens);
+    currentPuzzleSolution = puzzle.solution ?? null;
+    if (timerEnabled) armTimer();
   } catch (err) {
     console.error(err);
     generateStatus.textContent = '⚠️ 퍼즐 생성 실패, 다시 시도해주세요';
@@ -852,382 +633,423 @@ function toggleGeneratePanel() {
   if (generatePanel.classList.contains('show')) { closePanel(generatePanel); return; }
   openFloatingPanel(generatePanel);
 }
-
 btnOpenGenerate.addEventListener('click', toggleGeneratePanel);
 generateClose.addEventListener('click', () => closePanel(generatePanel));
 
-// ── 랜딩 / 게임 / 대기실 화면 전환 ──
-const LANDING_SUBVIEWS = [landingMain, landingMulti, landingCreate, landingJoin];
-
-function showLandingSub(target) {
-  for (const el of LANDING_SUBVIEWS) el.hidden = (el !== target);
-}
-
+// ── 화면 전환 ──
 function isGameActive() {
   return !gameScreen.classList.contains('hidden');
 }
 
-function hideAllTopScreens() {
-  landingScreen.classList.add('hidden');
-  gameScreen.classList.add('hidden');
-  waitingRoomScreen.classList.add('hidden');
-}
-
 function enterGame() {
-  hideAllTopScreens();
+  landingScreen.classList.add('hidden');
   gameScreen.classList.remove('hidden');
-  // 지금까지의 fitAndCenterBoard() 호출은 전부 #game-screen이 display:none인 채로
-  // 일어났을 수 있다(hidden 조상 아래에서는 키패드 바 실측 높이가 항상 0으로 잡힌다) -
-  // 화면이 실제로 보이는 지금 다시 불러서 세로 모바일 맞춤을 바로잡는다.
   fitAndCenterBoard();
 }
 
-function enterLandingAt(subview) {
-  hideAllTopScreens();
-  landingScreen.classList.remove('hidden');
-  showLandingSub(subview);
-}
-
 function enterLanding() {
-  exitBattleUI();
-  exitCoopUI();
-  if (mp) leaveCurrentRoom(); // 대기실/배틀/협동에 있던 상태로 메인 화면으로 돌아가면 방도 함께 나감
-  enterLandingAt(landingMain);
+  gameScreen.classList.add('hidden');
+  landingScreen.classList.remove('hidden');
+  closePanel(dailyResultModal);
+  refreshDailyCards();
 }
 
-function enterWaitingRoom() {
-  hideAllTopScreens();
-  waitingRoomScreen.classList.remove('hidden');
-}
+btnFreePlay.addEventListener('click', () => {
+  exitDailyMode();
+  mountBoard(createStandardSudokuStructures(0, 0), []);
+  enterGame();
+  openFloatingPanel(generatePanel);
+});
 
-btnLandingSingle.addEventListener('click', enterGame);
-btnLandingMulti.addEventListener('click', () => showLandingSub(landingMulti));
-btnMpCreate.addEventListener('click', () => { prefillNickname(lcNickname); showFormError(lcError, ''); showLandingSub(landingCreate); });
-btnMpJoin.addEventListener('click', () => { prefillNickname(ljNickname); showFormError(ljError, ''); showLandingSub(landingJoin); });
-btnMpBack.addEventListener('click', () => showLandingSub(landingMain));
-btnLcBack.addEventListener('click', () => showLandingSub(landingMulti));
-btnLjBack.addEventListener('click', () => showLandingSub(landingMulti));
 btnGoLanding.addEventListener('click', () => {
-  if (battleActive && !battleFinishedLocally) {
-    askConfirm('항복하고 나갈까요?<br/>순위에는 들지 못해요.', async () => {
-      if (mp) {
-        try { await roomClient.forfeitRoom(mp.code, mp.token); } catch (err) { console.error(err); }
-      }
-      // 방은 그대로 유지(소켓도 유지) - 다른 참가자의 리더보드/종료 결과에 "항복"으로 계속 보이도록.
-      // 게임이 끝나면 handleRoomPush가 조용히 정리한다.
-      exitBattleUI();
-      enterLandingAt(landingMulti);
+  if (dailyRun && !dailyRun.ended) {
+    askConfirm('메인 화면으로 돌아갈까요?<br/>진행 상황은 저장되고, 타이머는 계속 흘러갑니다.', () => {
+      persistDailyNow();
+      exitDailyMode();
+      enterLanding();
     });
     return;
   }
-  if (coopActive) {
-    // 협동은 개인 순위/항복 개념이 없어 그냥 나가기 확인만 하면 됨
-    askConfirm('메인 화면으로 돌아갈까요?', async () => {
-      exitCoopUI();
-      await leaveCurrentRoom();
-      enterLandingAt(landingMulti);
-    });
+  askConfirm('메인 화면으로 돌아갈까요?', () => { exitDailyMode(); enterLanding(); });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  데일리 모드
+// ══════════════════════════════════════════════════════════════════════════
+
+const TODAY = () => dateStrKST();
+
+async function fetchDaily(dateStr) {
+  if (dailyData && dailyDataDate === dateStr) return dailyData;
+  const res = await fetch(`daily/${dateStr}.json`, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`no daily ${dateStr}`);
+  dailyData = await res.json();
+  dailyDataDate = dateStr;
+  return dailyData;
+}
+
+function refreshDailyCards() {
+  landingDate.textContent = TODAY();
+  for (const [variant, btn] of [['standard', btnDailyStandard], ['extended', btnDailyExtended]]) {
+    const badge = btn.querySelector('.daily-card-status');
+    const p = loadProgress(TODAY(), variant);
+    if (!p) { badge.textContent = '아직 안 함'; badge.dataset.status = 'new'; }
+    else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
+    else if (p.status === 'timeout') { badge.textContent = '❌ 타임아웃'; badge.dataset.status = 'timeout'; }
+    else { badge.textContent = '진행 중'; badge.dataset.status = 'playing'; }
+  }
+}
+
+function fmtMMSS(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
+async function startDaily(variant) {
+  dailyErrorEl.textContent = '';
+  dailyLoadNote.hidden = false;
+  let data;
+  try {
+    data = await fetchDaily(TODAY());
+  } catch {
+    dailyLoadNote.hidden = true;
+    dailyErrorEl.textContent = '오늘의 퍼즐이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.';
     return;
   }
-  askConfirm('메인 화면으로 돌아갈까요?', enterLanding);
-});
+  dailyLoadNote.hidden = true;
 
-// ── 멀티플레이 ──
-const NICKNAME_STORAGE_KEY = 'sudoku-nickname';
+  const vd = data[variant];
+  const structures = reviveStructures(vd.structures);
+  mountBoard(structures, vd.givens);
+  currentPuzzleSolution = vd.solution ?? null;
+  cachedSolution = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
 
-function loadSavedNickname() {
-  try { return localStorage.getItem(NICKNAME_STORAGE_KEY) || ''; } catch { return ''; }
-}
-function saveNickname(nickname) {
-  try { localStorage.setItem(NICKNAME_STORAGE_KEY, nickname); } catch { /* 저장 실패해도 게임 진행엔 지장 없음 */ }
-}
-function prefillNickname(input) {
-  input.value = loadSavedNickname();
-}
-
-const lcPicker = createPicker({ shapeEl: lcShapeGroup, elementEl: lcElementGroup, difficultyEl: lcDifficultyGroup });
-const wrPicker = createPicker({
-  shapeEl: wrShapeGroup, elementEl: wrElementGroup, difficultyEl: wrDifficultyGroup,
-  onChange: (state) => applySettingChange({ templateId: encodeSelectionId(resolveRandomSelection(state)) }),
-});
-
-function showFormError(el, message) {
-  el.textContent = message || '';
-  el.classList.toggle('show', !!message);
-}
-
-function setModeToggle(battleBtn, coopBtn, mode, { disabled = false } = {}) {
-  battleBtn.classList.toggle('active', mode === 'battle');
-  coopBtn.classList.toggle('active', mode === 'coop');
-  battleBtn.disabled = disabled;
-  coopBtn.disabled = disabled;
-}
-
-let lcMode = 'battle';
-lcModeBattle.addEventListener('click', () => { lcMode = 'battle'; setModeToggle(lcModeBattle, lcModeCoop, lcMode); });
-lcModeCoop.addEventListener('click', () => { lcMode = 'coop'; setModeToggle(lcModeBattle, lcModeCoop, lcMode); });
-
-// mp는 파일 상단에서 이미 선언됨(renderer.onCellSelect의 TDZ 문제 방지)
-let lastRoomState = null;  // 마지막으로 받은 roomState push (닉네임 편집 취소/설정 실패 시 복원용)
-let leavingIntentionally = false;
-
-/**
- * 새로고침해도 방에서 튕겨나가지 않도록 code/token을 세션에 저장해둔다(탭을 닫으면 사라짐 -
- * 영구 저장은 아님). WS 연결은 이 token만으로 재개되고, 서버가 roomState(협동이면
- * coopCells 스냅샷 포함)를 다시 push해주므로 진행 상황이 그대로 복원된다.
- */
-const ROOM_SESSION_KEY = 'sudoku-room-session';
-function saveRoomSession(code, token) {
-  try { sessionStorage.setItem(ROOM_SESSION_KEY, JSON.stringify({ code, token })); } catch { /* 무시 */ }
-}
-function loadRoomSession() {
-  try { return JSON.parse(sessionStorage.getItem(ROOM_SESSION_KEY)); } catch { return null; }
-}
-function clearRoomSession() {
-  try { sessionStorage.removeItem(ROOM_SESSION_KEY); } catch { /* 무시 */ }
-}
-
-/** room.players(colorIndex 포함)에서 playerId로 색을 조회 — 못 찾으면(이미 나간 참가자 등) 무채색 폴백 */
-function colorForPlayerId(playerId) {
-  const p = lastRoomState?.players.find((p) => p.id === playerId);
-  return p ? colorForIndex(p.colorIndex) : '#a0aec0';
-}
-
-function nicknameForPlayerId(playerId) {
-  return lastRoomState?.players.find((p) => p.id === playerId)?.nickname ?? '';
-}
-
-/** room.coopDrawings 스냅샷(id/points/playerId)에 렌더러가 바로 쓸 수 있게 참가자 색을 붙여준다 */
-function coopDrawingsToStrokes(coopDrawings) {
-  return (coopDrawings ?? []).map((s) => ({
-    id: s.id, points: s.points, playerId: s.playerId, color: colorForPlayerId(s.playerId),
-  }));
-}
-
-function connectRoomSocket(code, token) {
-  return roomClient.connectSocket(code, token, {
-    onState: handleRoomPush,
-    onClose: () => {
-      if (leavingIntentionally) { leavingIntentionally = false; return; }
-      // 서버 재시작이나 유효하지 않은 세션(방이 이미 사라짐 등) - 조용히 방 목록 화면으로 복귀
-      mp = null;
-      lastRoomState = null;
-      clearRoomSession();
-      enterLandingAt(landingMulti);
-    },
-    onCoopCellUpdate: (msg) => {
-      if (!coopActive) return;
-      renderer.applyRemoteCellUpdate({
-        row: msg.row, col: msg.col, value: msg.value,
-        color: msg.filledBy ? colorForPlayerId(msg.filledBy) : null,
-      });
-      setCoopCellOwner(msg.row, msg.col, msg.filledBy);
-      renderCoopLeaderboard();
-    },
-    onCoopCursor: (msg) => {
-      if (!coopActive) return;
-      renderer.upsertRemoteCursor(msg.playerId, msg.row, msg.col, colorForPlayerId(msg.playerId), nicknameForPlayerId(msg.playerId));
-    },
-    onCoopRotate: (msg) => {
-      if (!coopActive) return;
-      renderer.applyRemoteRotate({
-        cells: msg.cells.map((c) => ({
-          row: c.row, col: c.col, value: c.value, isGiven: c.isGiven,
-          color: c.filledBy ? colorForPlayerId(c.filledBy) : null,
-        })),
-      });
-      for (const c of msg.cells) setCoopCellOwner(c.row, c.col, c.filledBy);
-      renderCoopLeaderboard();
-    },
-    onCoopAnswerUpdate: (msg) => {
-      if (!coopActive) return;
-      renderer.applyRemoteAnswerUpdate(msg.cells);
-      // 체크/보기로 고정된 칸은 given과 같아져 더는 "누가 채웠는지"가 의미 없으므로 집계에서 뺀다
-      for (const c of msg.cells) setCoopCellOwner(c.row, c.col, null);
-      renderCoopLeaderboard();
-    },
-    onCoopDraw: (msg) => {
-      if (!coopActive) return;
-      renderer.applyRemoteStroke({
-        id: msg.strokeId, points: msg.points,
-        playerId: msg.playerId, color: colorForPlayerId(msg.playerId),
-      });
-    },
-    onCoopDrawUndo: (msg) => {
-      if (!coopActive) return;
-      renderer.applyRemoteStrokeRemove(msg.strokeId);
-    },
-    onCoopDrawClear: () => {
-      if (!coopActive) return;
-      renderer.clearAllStrokes();
-    },
-  });
-}
-
-async function leaveCurrentRoom() {
-  if (!mp) return;
-  const { code, token, socket } = mp;
-  leavingIntentionally = true;
-  try { await roomClient.leaveRoom(code, token); } catch { /* 이미 사라졌을 수 있음 - 무시 */ }
-  if (socket && socket.readyState === WebSocket.OPEN) socket.close();
-  mp = null;
-  lastRoomState = null;
-  clearRoomSession();
-}
-
-function enterRoom({ token, isHost, room }) {
-  if (mp?.socket) mp.socket.close(); // 이전에 항복하고 남아있던 소켓이 있다면 정리
-  mp = { code: room.code, token, isHost, socket: null };
-  mp.socket = connectRoomSocket(room.code, token);
-  saveRoomSession(room.code, token);
-  enterWaitingRoom();
-  renderWaitingRoom(room); // 최초 push 도착 전 화면 깜빡임 방지용 즉시 렌더
-}
-
-/** 페이지 새로고침 등으로 모듈이 다시 로드됐을 때, 저장된 세션이 있으면 조용히 재접속을 시도한다 */
-function tryResumeRoomSession() {
-  const saved = loadRoomSession();
-  if (!saved?.code || !saved?.token) return;
-  mp = { code: saved.code, token: saved.token, isHost: false, socket: null };
-  mp.socket = connectRoomSocket(saved.code, saved.token);
-  // 첫 roomState push가 도착하면 handleRoomPush가 대기실/배틀/협동 중 맞는 화면으로 알아서 보내준다.
-  // 세션이 더는 유효하지 않으면(방 소멸 등) 위 onClose 핸들러가 랜딩으로 되돌리고 세션을 정리한다.
-}
-tryResumeRoomSession();
-
-btnLcSubmit.addEventListener('click', async () => {
-  showFormError(lcError, '');
-  const nickname = lcNickname.value.trim();
-  if (!nickname) { showFormError(lcError, '닉네임을 입력해주세요.'); return; }
-  saveNickname(nickname);
-
-  btnLcSubmit.disabled = true;
-  btnLcSubmit.textContent = '생성 중...';
-  try {
-    const result = await roomClient.createRoom({
-      nickname,
-      mode: lcMode,
-      maxPlayers: Number(lcMaxPlayers.value),
-      templateId: encodeSelectionId(resolveRandomSelection(lcPicker.state)),
-    });
-    enterRoom(result);
-  } catch (err) {
-    showFormError(lcError, err.message);
-  } finally {
-    btnLcSubmit.disabled = false;
-    btnLcSubmit.textContent = '방 생성';
+  const prog = loadProgress(TODAY(), variant);
+  if (prog && prog.cells) {
+    board.loadSerialized(prog.cells);
+    renderer.refresh();
   }
-});
 
-btnLjSubmit.addEventListener('click', async () => {
-  showFormError(ljError, '');
-  const nickname = ljNickname.value.trim();
-  const code = ljCode.value.trim();
-  if (!nickname) { showFormError(ljError, '닉네임을 입력해주세요.'); return; }
-  if (!/^\d{4}$/.test(code)) { showFormError(ljError, '4자리 방 코드를 입력해주세요.'); return; }
-  saveNickname(nickname);
-
-  btnLjSubmit.disabled = true;
-  btnLjSubmit.textContent = '참가 중...';
-  try {
-    const result = await roomClient.joinRoom(code, { nickname });
-    enterRoom(result);
-  } catch (err) {
-    showFormError(ljError, err.message);
-  } finally {
-    btnLjSubmit.disabled = false;
-    btnLjSubmit.textContent = '참가';
-  }
-});
-
-function startNicknameEdit(row, currentNickname) {
-  row.innerHTML = '';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'wr-nickname-input';
-  input.maxLength = 20;
-  input.value = currentNickname;
-  row.appendChild(input);
-  input.focus();
-  input.select();
-
-  const commit = async () => {
-    const value = input.value.trim();
-    if (value && value !== currentNickname && mp) {
-      saveNickname(value);
-      try {
-        await roomClient.updateNickname(mp.code, mp.token, value);
-      } catch (err) {
-        showFormError(wrError, err.message);
-      }
-    }
-    if (lastRoomState) renderWaitingRoom(lastRoomState);
+  dailyRun = {
+    date: TODAY(),
+    variant,
+    elements: variant === 'extended' ? vd.elements : null,
+    shape: data.shape,
+    solutionMap: cachedSolution,
+    startedAt: prog?.startedAt ?? null,
+    deadlineTs: prog?.startedAt ? prog.startedAt + DAILY_LIMIT_MS : null,
+    ended: prog ? prog.status !== 'playing' : false,
   };
 
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') input.blur();
-    if (e.key === 'Escape') { input.value = currentNickname; input.blur(); }
+  // 데일리에선 저장/불러오기/답지/자동생성 숨김 (워들식 — 힌트·재생성 불가)
+  setFreePlayControls(false);
+  renderElementSidebar(dailyRun);
+
+  timerEnabled = false;
+  timerToggleBtn.classList.remove('active');
+  disarmTimer();
+  timerDisplay.classList.add('show');
+
+  enterGame();
+
+  if (dailyRun.ended) {
+    // 이미 끝난 판 — 잠금 상태로 보여주고 결과 모달
+    boardLocked = true;
+    boardWrapper.classList.add('blurred');
+    boardStartOverlay.classList.remove('show');
+    timerDisplay.textContent = prog.status === 'solved' ? fmtMMSS(prog.elapsedMs) : '00:00';
+    showDailyResult(prog.status, prog.elapsedMs);
+    return;
+  }
+
+  if (dailyRun.startedAt) {
+    // 진행 중이던 판 재개
+    const remaining = dailyRun.deadlineTs - Date.now();
+    if (remaining <= 0) { endDaily('timeout'); return; }
+    boardLocked = false;
+    boardWrapper.classList.remove('blurred');
+    boardStartOverlay.classList.remove('show');
+    startDailyCountdown();
+  } else {
+    // 아직 시작 전 — 블러 + "시작" 오버레이
+    boardLocked = true;
+    boardWrapper.classList.add('blurred');
+    boardStartOverlay.classList.add('show');
+    timerDisplay.textContent = formatCountdown(DAILY_LIMIT_MS).slice(3); // MM:SS
+  }
+}
+
+function beginDailyTimer() {
+  if (!dailyRun || dailyRun.startedAt) return;
+  dailyRun.startedAt = Date.now();
+  dailyRun.deadlineTs = dailyRun.startedAt + DAILY_LIMIT_MS;
+  boardLocked = false;
+  boardWrapper.classList.remove('blurred');
+  boardStartOverlay.classList.remove('show');
+  saveProgress({
+    date: dailyRun.date, variant: dailyRun.variant,
+    startedAt: dailyRun.startedAt, status: 'playing',
+    cells: board.serialize(), elapsedMs: 0, finishedAt: null,
+  });
+  startDailyCountdown();
+}
+
+function startDailyCountdown() {
+  stopDailyCountdown();
+  const frame = () => {
+    if (!dailyRun || dailyRun.ended) return;
+    const remaining = dailyRun.deadlineTs - Date.now();
+    if (remaining <= 0) { endDaily('timeout'); return; }
+    const t = Math.floor(remaining / 1000);
+    timerDisplay.textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+    timerDisplay.classList.toggle('timer-danger', remaining < 60000);
+    dailyCountdownRAF = requestAnimationFrame(frame);
+  };
+  frame();
+}
+
+function stopDailyCountdown() {
+  if (dailyCountdownRAF !== null) { cancelAnimationFrame(dailyCountdownRAF); dailyCountdownRAF = null; }
+}
+
+function scheduleDailyPersist() {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
+  clearTimeout(dailyPersistTimer);
+  dailyPersistTimer = setTimeout(persistDailyNow, 800);
+}
+
+function persistDailyNow() {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
+  patchProgressCells(dailyRun.date, dailyRun.variant, board.serialize());
+}
+
+function endDaily(status) {
+  if (!dailyRun || dailyRun.ended) return;
+  dailyRun.ended = true;
+  stopDailyCountdown();
+  clearTimeout(dailyPersistTimer);
+  boardLocked = true;
+  boardWrapper.classList.add('blurred');
+  timerDisplay.classList.remove('timer-danger');
+
+  const elapsedMs = dailyRun.startedAt
+    ? Math.min(DAILY_LIMIT_MS, Date.now() - dailyRun.startedAt)
+    : DAILY_LIMIT_MS;
+
+  saveProgress({
+    date: dailyRun.date, variant: dailyRun.variant,
+    startedAt: dailyRun.startedAt, status,
+    cells: board.serialize(), elapsedMs, finishedAt: Date.now(),
+  });
+  recordResult(dailyRun.variant, dailyRun.date, status, elapsedMs);
+  refreshDailyCards();
+  showDailyResult(status, elapsedMs);
+}
+
+function exitDailyMode() {
+  stopDailyCountdown();
+  clearTimeout(dailyPersistTimer);
+  dailyRun = null;
+  elementSidebar.hidden = true;
+  elementSidebar.classList.remove('open');
+  timerDisplay.classList.remove('timer-danger', 'show');
+  boardLocked = false;
+  boardWrapper.classList.remove('blurred');
+  boardStartOverlay.classList.remove('show');
+  setFreePlayControls(true);
+}
+
+/** 데일리에서 숨기고 자유 연습에서 보이는 컨트롤 */
+function setFreePlayControls(on) {
+  btnOpenSave.classList.toggle('hidden', !on);
+  btnOpenGenerate.classList.toggle('hidden', !on);
+  btnOpenAnswerSheet.classList.toggle('hidden', !on);
+  timerToggleBtn.classList.toggle('hidden', !on);
+  if (!on) {
+    closePanel(savePanel); closePanel(generatePanel); closePanel(answerSheetPanel);
+  }
+}
+
+btnDailyStandard.addEventListener('click', () => startDaily('standard'));
+btnDailyExtended.addEventListener('click', () => startDaily('extended'));
+
+// ── 요소 안내 사이드바 (책갈피) ──
+function renderElementSidebar(run) {
+  if (!run || run.variant !== 'extended' || !run.elements) {
+    elementSidebar.hidden = true;
+    return;
+  }
+  const keys = [run.elements.main, run.elements.sub];
+  elementSidebarIcons.innerHTML = '';
+  elementSidebarList.innerHTML = '';
+  keys.forEach((key, i) => {
+    const info = ELEMENT_INFO[key];
+    if (!info) return;
+
+    const icon = document.createElement('span');
+    icon.className = 'element-sidebar-icon' + (i === 0 ? ' is-main' : '');
+    icon.textContent = info.icon;
+    elementSidebarIcons.appendChild(icon);
+
+    const item = document.createElement('div');
+    item.className = 'element-sidebar-item';
+    item.innerHTML =
+      `<span class="element-sidebar-item-head"><b>${info.icon}</b> ${info.label}` +
+      `<em>${i === 0 ? 'main' : 'sub'}</em></span>` +
+      `<span class="element-sidebar-item-desc">${info.desc}</span>`;
+    elementSidebarList.appendChild(item);
+  });
+  elementSidebar.hidden = false;
+}
+elementSidebarHandle.addEventListener('click', () => elementSidebar.classList.toggle('open'));
+
+// ── 데일리 결과 모달 ──
+function computeCompletionPct() {
+  if (!dailyRun) return 0;
+  let total = 0, correct = 0;
+  const sol = dailyRun.solutionMap;
+  for (const cell of board.getVisibleCells()) {
+    const key = `${cell.row},${cell.col}`;
+    if (cell.isGiven || !sol.has(key)) continue;
+    total++;
+    if (cell.value === sol.get(key)) correct++;
+  }
+  return total ? Math.round((correct / total) * 100) : 0;
+}
+
+function showDailyResult(status, elapsedMs) {
+  const isWin = status === 'solved';
+  dailyResultTitle.textContent = isWin ? '🎉 클리어!' : '⏱ 타임아웃';
+  dailyResultDetail.textContent = isWin
+    ? `${fmtMMSS(elapsedMs)} 만에 완성`
+    : `${computeCompletionPct()}% 완성`;
+
+  dailyResultGrid.textContent = dailyRun
+    ? buildShareGrid(board, dailyRun.solutionMap, dailyRun.shape).join('\n')
+    : '';
+
+  dailyShareNote.textContent = '';
+  openPanel(dailyResultModal);
+}
+
+function currentShareText() {
+  if (!dailyRun) return '';
+  const prog = loadProgress(dailyRun.date, dailyRun.variant);
+  return buildShareText({
+    date: dailyRun.date,
+    variant: dailyRun.variant,
+    status: prog?.status ?? 'timeout',
+    elapsedMs: prog?.elapsedMs ?? DAILY_LIMIT_MS,
+    elements: dailyRun.elements,
+    board,
+    solutionMap: dailyRun.solutionMap,
+    shape: dailyRun.shape,
+    url: SITE_URL,
   });
 }
 
-async function applySettingChange(partial) {
-  if (!mp || !mp.isHost) return;
-  showFormError(wrError, '');
-  try {
-    await roomClient.updateSettings(mp.code, mp.token, partial);
-  } catch (err) {
-    showFormError(wrError, err.message);
-    if (lastRoomState) renderWaitingRoom(lastRoomState); // 실패 시 폼을 서버 기준 값으로 되돌림
-  }
+async function shareText(text, noteEl) {
+  const ok = await copyText(text);
+  noteEl.textContent = ok ? '클립보드에 복사했어요!' : '복사에 실패했어요. 직접 선택해 복사해주세요.';
+  setTimeout(() => { noteEl.textContent = ''; }, 2600);
 }
 
-wrModeBattle.addEventListener('click', () => applySettingChange({ mode: 'battle' }));
-wrModeCoop.addEventListener('click', () => applySettingChange({ mode: 'coop' }));
-wrMaxPlayers.addEventListener('change', () => applySettingChange({ maxPlayers: Number(wrMaxPlayers.value) }));
-
-btnWrStart.addEventListener('click', async () => {
-  if (!mp || !lastRoomState) return;
-  showFormError(wrError, '');
-  btnWrStart.disabled = true;
-  try {
-    // 배틀/협동 둘 다 시작 시 퍼즐이 필요함 - 방장 브라우저에서 생성해 업로드
-    btnWrStart.textContent = '생성 중...';
-    const decoded = decodeSelectionId(lastRoomState.templateId);
-    if (!decoded) throw new Error('선택된 템플릿을 찾을 수 없어요.');
-    const template = buildTemplateFromSelection(decoded);
-    const puzzle = await generatePuzzle(template);
-    await roomClient.startRoom(mp.code, mp.token, {
-      puzzle: { structures: puzzle.structures, givens: puzzle.givens, solution: puzzle.solution },
-    });
-  } catch (err) {
-    showFormError(wrError, err.message);
-  } finally {
-    btnWrStart.disabled = false;
-    btnWrStart.textContent = '게임 시작';
-  }
+btnDailyResultShare.addEventListener('click', () => shareText(currentShareText(), dailyShareNote));
+btnDailyResultClose.addEventListener('click', () => closePanel(dailyResultModal));
+btnDailyResultStats.addEventListener('click', () => {
+  closePanel(dailyResultModal);
+  openStatsModal(dailyRun?.variant ?? 'standard');
+});
+dailyResultModal.addEventListener('click', (e) => {
+  if (e.target === dailyResultModal) closePanel(dailyResultModal);
 });
 
-btnWrLeave.addEventListener('click', async () => {
-  btnWrLeave.disabled = true;
-  await leaveCurrentRoom();
-  btnWrLeave.disabled = false;
-  enterLandingAt(landingMulti);
+// ── 통계 모달 ──
+let statsVariant = 'standard';
+let statsCountdownTimer = null;
+
+function openStatsModal(variant = 'standard') {
+  statsVariant = variant;
+  renderStatsModal();
+  openPanel(dailyStatsModal);
+  clearInterval(statsCountdownTimer);
+  const tick = () => { dailyNextCountdown.textContent = formatCountdown(msUntilNextKSTMidnight()); };
+  tick();
+  statsCountdownTimer = setInterval(tick, 1000);
+}
+
+function closeStatsModal() {
+  closePanel(dailyStatsModal);
+  clearInterval(statsCountdownTimer);
+}
+
+function renderStatsModal() {
+  document.querySelectorAll('.daily-stats-tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.variant === statsVariant);
+  });
+
+  const s = summarize(statsVariant, TODAY());
+  statPlayed.textContent = s.played;
+  statWinRate.textContent = s.winRate;
+  statStreak.textContent = s.curStreak;
+  statMaxStreak.textContent = s.maxStreak;
+
+  const max = Math.max(1, ...s.distribution);
+  dailyStatsDist.innerHTML = '';
+  s.distribution.forEach((count, i) => {
+    const row = document.createElement('div');
+    row.className = 'dist-row';
+    const label = document.createElement('span');
+    label.className = 'dist-label';
+    label.textContent = DIST_BUCKETS[i];
+    const barWrap = document.createElement('span');
+    barWrap.className = 'dist-bar-wrap';
+    const bar = document.createElement('span');
+    bar.className = 'dist-bar' + (i === 5 ? ' dist-bar-fail' : '');
+    bar.style.width = `${(count / max) * 100}%`;
+    bar.textContent = count;
+    barWrap.appendChild(bar);
+    row.append(label, barWrap);
+    dailyStatsDist.appendChild(row);
+  });
+
+  // 오늘 그 variant를 이미 끝냈으면 공유 활성
+  const prog = loadProgress(TODAY(), statsVariant);
+  btnDailyStatsShare.disabled = !(prog && prog.status !== 'playing');
+}
+
+document.querySelectorAll('.daily-stats-tab').forEach((t) => {
+  t.addEventListener('click', () => { statsVariant = t.dataset.variant; renderStatsModal(); });
+});
+dailyStatsClose.addEventListener('click', closeStatsModal);
+dailyStatsModal.addEventListener('click', (e) => { if (e.target === dailyStatsModal) closeStatsModal(); });
+btnLandingStats.addEventListener('click', () => openStatsModal('standard'));
+
+btnDailyStatsShare.addEventListener('click', async () => {
+  const prog = loadProgress(TODAY(), statsVariant);
+  if (!prog || prog.status === 'playing') return;
+  let data;
+  try { data = await fetchDaily(TODAY()); } catch { return; }
+  const vd = data[statsVariant];
+  // 통계창에서 공유할 땐 저장된 셀로 임시 보드를 만들어 그리드를 계산
+  const tmp = new Board();
+  tmp.addStructures(reviveStructures(vd.structures));
+  tmp.loadGivens(vd.givens);
+  if (prog.cells) tmp.loadSerialized(prog.cells);
+  const solMap = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
+  const text = buildShareText({
+    date: TODAY(), variant: statsVariant, status: prog.status, elapsedMs: prog.elapsedMs,
+    elements: statsVariant === 'extended' ? vd.elements : null,
+    board: tmp, solutionMap: solMap, shape: data.shape, url: SITE_URL,
+  });
+  shareText(text, dailyStatsShareNote);
 });
 
-/**
- * navigator.clipboard는 보안 컨텍스트(https 또는 localhost)에서만 존재한다.
- * LAN IP(http://192.168.x.x 등)로 접속한 경우처럼 그 외 상황엔 없거나 던질 수 있어
- * 임시 textarea + execCommand('copy') 폴백으로 대응한다.
- */
+// ── 클립보드 복사 (clipboard + textarea fallback) ──
 async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (err) {
-      console.error(err);
-    }
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch (err) { console.error(err); }
   }
   try {
     const textarea = document.createElement('textarea');
@@ -1240,552 +1062,13 @@ async function copyText(text) {
     const ok = document.execCommand('copy');
     document.body.removeChild(textarea);
     return ok;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
+  } catch (err) { console.error(err); return false; }
 }
 
-btnWrCopyCode.addEventListener('click', async () => {
-  if (!mp) return;
-  const ok = await copyText(mp.code);
-  btnWrCopyCode.textContent = ok ? '복사됨!' : '복사 실패';
-  setTimeout(() => { btnWrCopyCode.textContent = '복사'; }, 1500);
-});
-
-function renderWaitingRoom(room) {
-  if (!mp) return; // 이미 나간 뒤 도착한 지연 push 방어
-  lastRoomState = room;
-  wrCode.textContent = room.code;
-
-  const isHost = room.you?.isHost ?? false;
-  mp.isHost = isHost;
-
-  wrPlayerList.innerHTML = '';
-  for (const p of room.players) {
-    const row = document.createElement('div');
-    row.className = 'wr-player-row';
-    const isMe = p.id === room.you?.id;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'wr-player-nickname';
-    nameSpan.textContent = p.nickname;
-    row.appendChild(nameSpan);
-
-    if (p.isHost) {
-      const badge = document.createElement('span');
-      badge.className = 'wr-host-badge';
-      badge.textContent = '방장';
-      row.appendChild(badge);
-    }
-
-    if (isMe) {
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'wr-nickname-edit-btn';
-      editBtn.textContent = '✎';
-      editBtn.addEventListener('click', () => startNicknameEdit(row, p.nickname));
-      row.appendChild(editBtn);
-    }
-
-    wrPlayerList.appendChild(row);
-  }
-
-  setModeToggle(wrModeBattle, wrModeCoop, room.mode, { disabled: !isHost });
-  wrMaxPlayers.value = room.maxPlayers;
-  wrMaxPlayers.disabled = !isHost;
-  wrPicker.setState(decodeSelectionId(room.templateId) ?? createPickerState());
-  wrPicker.setDisabled(!isHost);
-  wrReadonlyNote.hidden = isHost;
-
-  const playing = room.status === 'playing';
-  wrBody.hidden = playing;
-  wrStarting.hidden = !playing;
-  btnWrStart.hidden = !isHost || playing;
-  wrWaitingNote.hidden = isHost || playing;
-}
-
-// ── 배틀 모드 ──
-let battleActive = false;          // 지금 배틀 게임 화면에 들어와 있는지
-let battleFinishedLocally = false; // 이번 배틀에서 이미 완주 보고를 했는지 (중복 보고 방지)
-let battleRAF = null;
-let battleCountdownRAF = null;
-
-/** roomState push를 받을 때마다: 방 상태에 따라 대기실/배틀 화면 중 어디를 갱신할지 정한다 */
-function handleRoomPush(room) {
-  if (!mp) return;
-  mp.isHost = room.you?.isHost ?? mp.isHost;
-
-  if (room.status === 'ended') {
-    lastRoomState = room;
-    if (battleActive) {
-      showBattleEndedOverlay(room);
-    } else if (coopActive) {
-      showCoopEndedOverlay(room);
-    } else {
-      // 항복 등으로 이미 게임 화면을 벗어난 상태(랜딩에 있음) - 볼 화면이 없으므로 방 연결만 조용히 정리
-      leaveCurrentRoom();
-    }
-    return;
-  }
-
-  if (room.mode === 'battle' && room.status === 'playing') {
-    lastRoomState = room;
-    if (!battleActive) enterBattleGame(room);
-    return; // 이미 배틀 중이면 rAF 루프가 lastRoomState를 계속 읽어 그리므로 별도 렌더 불필요
-  }
-
-  if (room.mode === 'coop' && room.status === 'playing') {
-    lastRoomState = room;
-    if (!coopActive) {
-      enterCoopGame(room);
-    } else {
-      // 이미 진행 중이면 칸 값/회전은 보통 coopCellUpdate/coopRotate push로 각각 반영되지만,
-      // 이 roomState push의 coopCells은 항상 서버의 "지금 이 순간" 전체 스냅샷이므로 그대로
-      // 다시 적용해도 안전(멱등)하다 - 불러오기(coop-load)처럼 칸을 한꺼번에 바꾸는 액션은
-      // 별도 메시지 타입 없이 이 경로로만 전파되므로 반드시 필요하다.
-      if (room.coopCells) {
-        renderer.loadCoopCells(room.coopCells.map((c) => ({
-          row: c.row, col: c.col, value: c.value,
-          color: c.filledBy ? colorForPlayerId(c.filledBy) : null,
-        })));
-        resetCoopFillCounts(room.coopCells);
-      }
-      // 방을 나간 참가자의 원격 커서 정리 + 참가자 목록이 바뀌었을 수 있으니 현황판도 새로 그린다
-      renderer.pruneRemoteCursors(new Set(room.players.map((p) => p.id)));
-      renderCoopLeaderboard();
-      // 그리기도 coopDraw/coopDrawUndo/coopDrawClear로 실시간 반영되지만, 재접속 등으로
-      // 놓친 이벤트가 있을 수 있으니 전체 스냅샷과 다시 맞춰준다(중복/누락 없이 멱등하게 동작)
-      renderer.syncStrokes(coopDrawingsToStrokes(room.coopDrawings));
-    }
-    syncCoopVoteUI(room);
-    return;
-  }
-
-  if (waitingRoomScreen.classList.contains('hidden')) {
-    // 배틀 종료/협동 완성 오버레이 등 게임 화면에서 대기실로 돌아온 경우 - 정리 후 화면 전환
-    exitBattleUI();
-    exitCoopUI();
-    closePanel(battleEndedOverlay);
-    closePanel(coopEndedOverlay);
-    enterWaitingRoom();
-  }
-  renderWaitingRoom(room);
-}
-
-/**
- * 퍼즐 선택/자동 생성/타이머는 멀티플레이 진행 중엔 의미가 없으므로(퍼즐이 방 단위로 고정되고,
- * 타이머는 배틀/협동 전용 표시로 대체됨) 아예 숨긴다. 저장/불러오기는 모드마다 의미가 달라서
- * (배틀: 개인전이라 막음 / 협동: 다같이 쓰는 보드라 허용) 호출하는 쪽에서 따로 처리한다.
- */
-function setMultiplayerControlsDisabled(disabled) {
-  btnOpenPuzzle.classList.toggle('hidden', disabled);
-  btnOpenGenerate.classList.toggle('hidden', disabled);
-  timerToggleBtn.classList.toggle('hidden', disabled);
-}
-
-/** 배틀 시작 카운트다운 — 서버가 정한 미래 시각(playingStartedAt)까지 전원 동시에 센다 */
-function startSyncedCountdown(playingStartedAt) {
-  stopSyncedCountdown();
-  const remaining = playingStartedAt - Date.now();
-  if (remaining <= 0) return; // 이미 시작 시각이 지남(늦게 입장 등) - 카운트다운 없이 바로 시작
-
-  boardLocked = true;
-  boardWrapper.classList.add('blurred');
-  battleCountdownOverlay.classList.remove('hidden');
-
-  function frame() {
-    const left = playingStartedAt - Date.now();
-    if (left <= 0) { stopSyncedCountdown(); return; }
-    battleCountdownNumber.textContent = String(Math.ceil(left / 1000));
-    battleCountdownRAF = requestAnimationFrame(frame);
-  }
-  frame();
-}
-
-function stopSyncedCountdown() {
-  if (battleCountdownRAF !== null) { cancelAnimationFrame(battleCountdownRAF); battleCountdownRAF = null; }
-  boardLocked = false;
-  boardWrapper.classList.remove('blurred');
-  battleCountdownOverlay.classList.add('hidden');
-}
-
-/** 배틀 화면에서 벗어날 때(항복/완주 후 나가기/게임 종료) 공통 정리 */
-function exitBattleUI() {
-  battleActive = false;
-  battleFinishedLocally = false;
-  stopBattleLeaderboardLoop();
-  stopSyncedCountdown();
-  battleLeaderboard.classList.add('hidden');
-  closePanel(battleEndedOverlay);
-  setMultiplayerControlsDisabled(false);
-  btnOpenSave.disabled = false;
-  btnOpenAnswerSheet.classList.remove('hidden'); // 답지는 배틀 전용으로 숨겼던 것 - 싱글/협동으로 돌아가면 복원
-}
-
-function enterBattleGame(room) {
-  const structures = reviveStructures(room.puzzle.structures);
-  mountBoard(structures, room.puzzle.givens);
-
-  // 싱글플레이용 연습 타이머(블러+시작 오버레이)는 배틀과 무관하므로 완전히 꺼둔다
-  timerEnabled = false;
-  timerToggleBtn.classList.remove('active');
-  timerDisplay.classList.remove('show');
-  disarmTimer();
-
-  setMultiplayerControlsDisabled(true);
-  btnOpenSave.disabled = true; // 배틀은 각자 독립된 개인전이라 저장/불러오기를 막아둔다
-  btnOpenAnswerSheet.classList.add('hidden'); // 정답 보기는 배틀(경쟁) 취지에 안 맞으므로 숨김
-  closePanel(answerSheetPanel);
-  enterGame();
-
-  battleActive = true;
-  battleFinishedLocally = false;
-  battleLeaderboard.classList.remove('hidden');
-  battleLeaderboardCode.textContent = room.code;
-  renderBattleLeaderboard(room);
-  startBattleLeaderboardLoop();
-  startSyncedCountdown(room.playingStartedAt); // 이미 시작 시각이 지났으면 내부에서 알아서 스킵
-}
-
-function renderBattleLeaderboardInto(listEl, room, { showUnfinishedAsDNF = false } = {}) {
-  if (!room || !room.playingStartedAt) return;
-  const now = Date.now();
-  const finished = room.players.filter((p) => p.gameStatus === 'finished').sort((a, b) => a.elapsedMs - b.elapsedMs);
-  const playing = room.players.filter((p) => p.gameStatus === 'playing');
-  const forfeited = room.players.filter((p) => p.gameStatus === 'forfeited');
-  const ordered = [...finished, ...playing, ...forfeited];
-
-  listEl.innerHTML = '';
-  for (const p of ordered) {
-    const row = document.createElement('div');
-    row.className = 'battle-leaderboard-row';
-
-    let rankText = '';
-    let timerText;
-    if (p.gameStatus === 'finished') {
-      rankText = String(finished.indexOf(p) + 1);
-      timerText = formatTimer(p.elapsedMs ?? 0);
-      row.classList.add('battle-finished');
-    } else if (p.gameStatus === 'forfeited') {
-      timerText = '항복';
-      row.classList.add('battle-forfeited');
-    } else {
-      timerText = showUnfinishedAsDNF ? '미완주' : formatTimer(Math.max(0, now - room.playingStartedAt));
-    }
-
-    const rank = document.createElement('span');
-    rank.className = 'battle-rank';
-    rank.textContent = rankText;
-    row.appendChild(rank);
-
-    const name = document.createElement('span');
-    name.className = 'battle-nickname';
-    name.textContent = p.nickname;
-    row.appendChild(name);
-
-    const timer = document.createElement('span');
-    timer.className = 'battle-timer';
-    timer.textContent = timerText;
-    row.appendChild(timer);
-
-    listEl.appendChild(row);
-  }
-}
-
-function renderBattleLeaderboard(room) {
-  renderBattleLeaderboardInto(battleLeaderboardList, room);
-}
-
-function battleLeaderboardFrame() {
-  if (!battleActive) return;
-  if (lastRoomState) renderBattleLeaderboard(lastRoomState);
-  battleRAF = requestAnimationFrame(battleLeaderboardFrame);
-}
-
-function startBattleLeaderboardLoop() {
-  stopBattleLeaderboardLoop();
-  battleRAF = requestAnimationFrame(battleLeaderboardFrame);
-}
-
-function stopBattleLeaderboardLoop() {
-  if (battleRAF !== null) { cancelAnimationFrame(battleRAF); battleRAF = null; }
-}
-
-function showBattleEndedOverlay(room) {
-  stopBattleLeaderboardLoop();
-  battleActive = false;
-  renderBattleLeaderboardInto(battleEndedList, room, { showUnfinishedAsDNF: true });
-  openPanel(battleEndedOverlay);
-}
-
-btnBattleEndedContinue.addEventListener('click', async () => {
-  if (!mp) return;
-  try {
-    // 서버가 방을 'waiting'으로 되돌리면 그 결과가 roomState push로 돌아와 handleRoomPush가
-    // 알아서 대기실 화면으로 전환해준다(다른 참가자들도 동시에 같은 push를 받는다).
-    await roomClient.returnToWaiting(mp.code, mp.token);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-document.addEventListener('sudoku:solved', () => {
-  if (!battleActive || battleFinishedLocally || !mp) return;
-  battleFinishedLocally = true;
-  roomClient.finishRoom(mp.code, mp.token).catch((err) => console.error(err));
-});
-
-// ── 협동 모드 ──
-// coopActive는 파일 상단에서 이미 선언됨(renderer.onCellSelect의 TDZ 문제 방지)
-let coopRAF = null; // 공유(전원 동일) 경과시간 표시 루프
-let coopCellOwners = new Map(); // "r,c" -> 그 칸을 채운 playerId (진행 현황 집계용, 렌더러의 색상 Map과는 별개)
-let coopFillCounts = new Map(); // playerId -> 채운 칸 수
-let hiddenDrawPlayerIds = new Set(); // 내가 "그림 숨기기"로 꺼둔 참가자 id (순전히 로컬 표시용, 새 게임마다 초기화)
-
-/** cellOwners/fillCounts를 room.coopCells 스냅샷으로부터 처음부터 다시 계산 */
-function resetCoopFillCounts(coopCells) {
-  coopCellOwners = new Map();
-  coopFillCounts = new Map();
-  for (const c of coopCells ?? []) {
-    if (c.filledBy) setCoopCellOwner(c.row, c.col, c.filledBy);
-  }
-}
-
-/** 한 칸의 소유자가 바뀔 때(입력/지우기) 이전 소유자 카운트는 내리고 새 소유자는 올린다 */
-function setCoopCellOwner(row, col, playerId) {
-  const key = `${row},${col}`;
-  const prev = coopCellOwners.get(key);
-  if (prev) coopFillCounts.set(prev, Math.max(0, (coopFillCounts.get(prev) ?? 1) - 1));
-  if (playerId) {
-    coopCellOwners.set(key, playerId);
-    coopFillCounts.set(playerId, (coopFillCounts.get(playerId) ?? 0) + 1);
-  } else {
-    coopCellOwners.delete(key);
-  }
-}
-
-/** 오른쪽 위 협동 진행 현황 패널 — 배틀 리더보드와 같은 자리/모양, 순위 대신 참가자별 채운 칸 수 */
-function renderCoopLeaderboard() {
-  if (!lastRoomState) return;
-  coopLeaderboardList.innerHTML = '';
-  for (const p of lastRoomState.players) {
-    const row = document.createElement('div');
-    row.className = 'battle-leaderboard-row';
-
-    const dot = document.createElement('span');
-    dot.className = 'player-color-dot';
-    dot.style.background = colorForIndex(p.colorIndex);
-    row.appendChild(dot);
-
-    const name = document.createElement('span');
-    name.className = 'battle-nickname';
-    name.textContent = p.nickname;
-    row.appendChild(name);
-
-    const count = document.createElement('span');
-    count.className = 'coop-fill-count';
-    count.textContent = String(coopFillCounts.get(p.id) ?? 0);
-    row.appendChild(count);
-
-    const drawToggle = document.createElement('button');
-    drawToggle.type = 'button';
-    drawToggle.className = 'coop-draw-toggle-btn';
-    const isHidden = hiddenDrawPlayerIds.has(p.id);
-    drawToggle.textContent = isHidden ? '🚫' : '👁';
-    drawToggle.classList.toggle('drawings-hidden', isHidden);
-    drawToggle.setAttribute('aria-label', `${p.nickname}님이 그린 그림 ${isHidden ? '보이기' : '숨기기'}`);
-    drawToggle.title = drawToggle.getAttribute('aria-label');
-    drawToggle.addEventListener('click', () => {
-      const next = !hiddenDrawPlayerIds.has(p.id);
-      if (next) hiddenDrawPlayerIds.add(p.id);
-      else hiddenDrawPlayerIds.delete(p.id);
-      renderer.setPlayerStrokesHidden(p.id, next);
-      renderCoopLeaderboard();
-    });
-    row.appendChild(drawToggle);
-
-    coopLeaderboardList.appendChild(row);
-  }
-}
-
-/** room.coopVote(진행 중이면 찬성한 플레이어 id 목록)를 보고 중지 투표 패널을 열거나 닫는다 */
-function syncCoopVoteUI(room) {
-  if (!room.coopVote) {
-    closePanel(coopVotePanel);
-    return;
-  }
-  const agreed = new Set(room.coopVote.votes);
-  coopVoteList.innerHTML = '';
-  for (const p of room.players) {
-    const row = document.createElement('div');
-    row.className = 'battle-leaderboard-row';
-
-    const name = document.createElement('span');
-    name.className = 'battle-nickname';
-    name.textContent = p.nickname;
-    row.appendChild(name);
-
-    const status = document.createElement('span');
-    const hasAgreed = agreed.has(p.id);
-    status.className = 'coop-vote-status' + (hasAgreed ? ' agreed' : '');
-    status.textContent = hasAgreed ? '✓' : '✗';
-    row.appendChild(status);
-
-    coopVoteList.appendChild(row);
-  }
-  openFloatingPanel(coopVotePanel);
-}
-
-coopVoteClose.addEventListener('click', () => closePanel(coopVotePanel));
-
-btnCoopStopVote.addEventListener('click', async () => {
-  if (!mp) return;
-  try {
-    await roomClient.castCoopVote(mp.code, mp.token, true);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-btnCoopVoteAgree.addEventListener('click', async () => {
-  if (!mp) return;
-  try {
-    await roomClient.castCoopVote(mp.code, mp.token, true);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-btnCoopVoteDisagree.addEventListener('click', async () => {
-  if (!mp) return;
-  try {
-    await roomClient.castCoopVote(mp.code, mp.token, false);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-/** 협동 화면에서 벗어날 때(나가기/게임 종료) 공통 정리 */
-function exitCoopUI() {
-  coopActive = false;
-  stopCoopTimerLoop();
-  stopSyncedCountdown();
-  renderer.remoteInputHandler = null;
-  renderer.remoteRotateHandler = null;
-  renderer.clearRemoteCursors();
-  timerDisplay.classList.remove('show');
-  coopLeaderboard.classList.add('hidden');
-  btnResetMine.classList.add('hidden');
-  btnCoopStopVote.classList.add('hidden');
-  closePanel(coopVotePanel);
-  setMultiplayerControlsDisabled(false);
-  btnOpenSave.disabled = false;
-}
-
-function enterCoopGame(room) {
-  const structures = reviveStructures(room.puzzle.structures);
-  mountBoard(structures, room.puzzle.givens);
-
-  // 그리기는 협동 모드에선 내 참가자 색으로 그려지도록(다른 참가자 획과 구분되게)
-  renderer.myPlayerId = room.you?.id ?? null;
-  renderer.drawColor = renderer.myPlayerId ? colorForPlayerId(renderer.myPlayerId) : 'var(--draw-ink)';
-  hiddenDrawPlayerIds = new Set(); // 새 게임이므로 이전 라운드에 숨겨뒀던 참가자 설정은 초기화
-
-  // 싱글플레이용 연습 타이머는 협동과 무관하므로 완전히 꺼두고, 공유 타이머만 표시
-  timerEnabled = false;
-  timerToggleBtn.classList.remove('active');
-  disarmTimer();
-
-  if (room.coopCells) {
-    renderer.loadCoopCells(room.coopCells.map((c) => ({
-      row: c.row, col: c.col, value: c.value,
-      color: c.filledBy ? colorForPlayerId(c.filledBy) : null,
-    })));
-  }
-  resetCoopFillCounts(room.coopCells);
-  renderer.syncStrokes(coopDrawingsToStrokes(room.coopDrawings)); // 도중 참가/재접속 시 이미 그려진 획을 그대로 이어받는다
-  // 값 입력/턴테이블 회전 모두 로컬로 바로 반영되지 않고 서버 확정(coopCellUpdate/coopRotate push) 후에만 반영된다
-  renderer.remoteInputHandler = (row, col, value) => {
-    if (mp?.socket) roomClient.sendCoopEdit(mp.socket, { row, col, value });
-  };
-  renderer.remoteRotateHandler = (structure, steps) => {
-    if (mp?.socket) {
-      roomClient.sendCoopRotate(mp.socket, { originRow: structure.originRow, originCol: structure.originCol, steps });
-    }
-  };
-
-  setMultiplayerControlsDisabled(true);
-  btnOpenSave.disabled = false; // 협동은 다같이 쓰는 보드라 저장/불러오기를 그대로 허용
-  enterGame();
-
-  coopActive = true;
-  timerDisplay.classList.add('show');
-  coopLeaderboard.classList.remove('hidden');
-  coopLeaderboardCode.textContent = room.code;
-  btnResetMine.classList.remove('hidden');
-  btnCoopStopVote.classList.remove('hidden');
-  renderCoopLeaderboard();
-  syncCoopVoteUI(room); // 도중 참가 시 이미 진행 중이던 투표가 있으면 곧바로 팝업을 띄워준다
-  startCoopTimerLoop();
-  startSyncedCountdown(room.playingStartedAt); // 이미 시작 시각이 지났으면 내부에서 알아서 스킵
-
-  // 다른 참가자가 내 초기 선택 칸을 바로 볼 수 있도록 최초 커서 위치도 한 번 보내둔다
-  if (renderer.selectedCell && mp?.socket) {
-    roomClient.sendCoopCursor(mp.socket, renderer.selectedCell);
-  }
-}
-
-function coopTimerFrame() {
-  if (!coopActive) return;
-  if (lastRoomState?.playingStartedAt) {
-    timerDisplay.textContent = formatTimer(Math.max(0, Date.now() - lastRoomState.playingStartedAt));
-  }
-  coopRAF = requestAnimationFrame(coopTimerFrame);
-}
-
-function startCoopTimerLoop() {
-  stopCoopTimerLoop();
-  coopRAF = requestAnimationFrame(coopTimerFrame);
-}
-
-function stopCoopTimerLoop() {
-  if (coopRAF !== null) { cancelAnimationFrame(coopRAF); coopRAF = null; }
-}
-
-function showCoopEndedOverlay(room) {
-  stopCoopTimerLoop();
-  coopActive = false;
-
-  coopEndedList.innerHTML = '';
-  for (const p of room.players) {
-    const row = document.createElement('div');
-    row.className = 'battle-leaderboard-row';
-    const name = document.createElement('span');
-    name.className = 'battle-nickname';
-    name.textContent = p.nickname;
-    row.appendChild(name);
-    coopEndedList.appendChild(row);
-  }
-  coopEndedTime.textContent = (room.endedAt && room.playingStartedAt)
-    ? formatTimer(room.endedAt - room.playingStartedAt)
-    : '';
-  openPanel(coopEndedOverlay);
-}
-
-btnCoopEndedContinue.addEventListener('click', async () => {
-  if (!mp) return;
-  try {
-    await roomClient.returnToWaiting(mp.code, mp.token);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-// ── 타이머 ──
+// ── 타이머 (자유 연습: 위로 세는 연습 타이머) ──
 let timerEnabled   = false;
 let timerRunning   = false;
-let boardLocked    = false; // 타이머가 켜져 있고 아직 "시작"을 누르기 전 (게임판 조작 차단)
+let boardLocked    = false;
 let timerElapsedMs = 0;
 let timerStartedAt = 0;
 let timerRAF       = null;
@@ -1803,20 +1086,13 @@ function renderTimerDisplay() {
   const current = timerElapsedMs + (timerRunning ? performance.now() - timerStartedAt : 0);
   timerDisplay.textContent = formatTimer(current);
 }
-
 function timerFrame() {
   renderTimerDisplay();
   if (timerRunning) timerRAF = requestAnimationFrame(timerFrame);
 }
-
 function stopTimerFrame() {
-  if (timerRAF !== null) {
-    cancelAnimationFrame(timerRAF);
-    timerRAF = null;
-  }
+  if (timerRAF !== null) { cancelAnimationFrame(timerRAF); timerRAF = null; }
 }
-
-/** 타이머 켜짐 / 새 퍼즐 로드: "시작" 누르기 전 상태로 리셋하고 게임판을 블러+잠금 */
 function armTimer() {
   timerRunning = false;
   timerElapsedMs = 0;
@@ -1826,8 +1102,6 @@ function armTimer() {
   boardWrapper.classList.add('blurred');
   boardStartOverlay.classList.add('show');
 }
-
-/** 타이머 꺼짐: 블러/잠금 해제, 시간 리셋 */
 function disarmTimer() {
   timerRunning = false;
   timerElapsedMs = 0;
@@ -1838,6 +1112,7 @@ function disarmTimer() {
 }
 
 timerToggleBtn.addEventListener('click', () => {
+  if (dailyRun) return;
   timerEnabled = !timerEnabled;
   timerToggleBtn.classList.toggle('active', timerEnabled);
   timerDisplay.classList.toggle('show', timerEnabled);
@@ -1845,29 +1120,8 @@ timerToggleBtn.addEventListener('click', () => {
   else disarmTimer();
 });
 
-// ── 다크 모드 — index.html 머리말의 인라인 스크립트가 body 렌더 전에 이미 한 번
-// 적용해뒀으므로(라이트 테마 번쩍임 방지), 여기서는 버튼 활성 표시를 맞추고 토글만 담당한다 ──
-const DARK_MODE_KEY = 'sudoku-dark-mode';
-
-function saveDarkModePref(on) {
-  try { localStorage.setItem(DARK_MODE_KEY, on ? '1' : '0'); } catch { /* 저장 실패해도 진행엔 지장 없음 */ }
-}
-
-function applyDarkMode(on) {
-  if (on) document.documentElement.setAttribute('data-theme', 'dark');
-  else document.documentElement.removeAttribute('data-theme');
-  btnToggleDarkMode.classList.toggle('active', on);
-}
-
-applyDarkMode(document.documentElement.getAttribute('data-theme') === 'dark');
-
-btnToggleDarkMode.addEventListener('click', () => {
-  const next = document.documentElement.getAttribute('data-theme') !== 'dark';
-  applyDarkMode(next);
-  saveDarkModePref(next);
-});
-
 btnStartTimer.addEventListener('click', () => {
+  if (dailyRun && !dailyRun.ended) { beginDailyTimer(); return; }
   if (!timerEnabled || timerRunning) return;
   boardLocked = false;
   boardWrapper.classList.remove('blurred');
@@ -1877,56 +1131,83 @@ btnStartTimer.addEventListener('click', () => {
   timerFrame();
 });
 
+// ── 다크 모드 ──
+const DARK_MODE_KEY = 'sudoku-dark-mode';
+function saveDarkModePref(on) {
+  try { localStorage.setItem(DARK_MODE_KEY, on ? '1' : '0'); } catch { /* 무시 */ }
+}
+function applyDarkMode(on) {
+  if (on) document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+  btnToggleDarkMode.classList.toggle('active', on);
+}
+applyDarkMode(document.documentElement.getAttribute('data-theme') === 'dark');
+function toggleDarkMode() {
+  const next = document.documentElement.getAttribute('data-theme') !== 'dark';
+  applyDarkMode(next);
+  saveDarkModePref(next);
+}
+btnToggleDarkMode.addEventListener('click', toggleDarkMode);
+btnLandingDark.addEventListener('click', toggleDarkMode);
+
+// ── 완성 이벤트 ──
 document.addEventListener('sudoku:solved', () => {
+  if (dailyRun && !dailyRun.ended) {
+    endDaily('solved');
+    return;
+  }
   if (timerRunning) {
     timerElapsedMs += performance.now() - timerStartedAt;
     timerRunning = false;
     stopTimerFrame();
     renderTimerDisplay();
   }
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2400);
 });
 
 // ── 키보드 단축키 ──
 const ARROW_DIR = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
 window.addEventListener('keydown', (e) => {
-  // 0) 랜딩 화면에서는(게임 화면이 안 보이는 동안) 게임 조작 단축키를 전부 무시
   if (!isGameActive()) return;
 
-  // 1) 확인 모달이 떠 있으면 그 외 모든 단축키 차단, Esc/Enter만 처리
+  if (dailyStatsModal.classList.contains('show')) {
+    if (e.key === 'Escape') closeStatsModal();
+    return;
+  }
+  if (dailyResultModal.classList.contains('show')) {
+    if (e.key === 'Escape') closePanel(dailyResultModal);
+    return;
+  }
+
   if (confirmModal.classList.contains('show')) {
     if (e.key === 'Escape') cancelConfirm();
     else if (e.key === 'Enter') runPendingConfirm();
     return;
   }
 
-  // 2) H = 도움말 토글
   if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     toggleHelpPanel();
     return;
   }
 
-  // 3) Ctrl/Cmd+S = 저장/불러오기 토글
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-    e.preventDefault(); // 브라우저 페이지 저장 다이얼로그 방지
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !dailyRun) {
+    e.preventDefault();
     toggleSavePanel();
     return;
   }
 
-  // 4) Esc = 열려있는 저장/도움말/퍼즐 선택 패널 닫기
   if (e.key === 'Escape') {
     closePanel(savePanel);
     closePanel(helpPanel);
-    closePanel(puzzlePanel);
     closePanel(generatePanel);
+    closePanel(answerSheetPanel);
     return;
   }
 
-  // 5) 위 패널들이 열려있는 동안은 게임 조작 단축키 차단
   if (isFloatingPanelOpen()) return;
-
-  // 5-1) 타이머가 켜져 있고 아직 "시작"을 누르기 전이면 게임 조작 단축키 차단
   if (boardLocked) return;
 
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -1936,11 +1217,6 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'ShiftLeft') {
     if (!e.repeat) toggleNoteMode();
-    return;
-  }
-  if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault();
-    if (!e.repeat) toggleDrawMode();
     return;
   }
   if (ARROW_DIR[e.key]) {
@@ -1958,9 +1234,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ── WASD 부드러운 게임 판 이동 ──
-const PAN_SPEED = 700; // px/sec
-// moveBy(dx,dy)는 보드 패널 자체를 옮기므로, "시야를 오른쪽으로 이동"처럼 느끼게 하려면
-// 패널은 반대 방향(왼쪽)으로 움직여야 한다 - 그래서 부호가 방향과 반대로 되어 있다.
+const PAN_SPEED = 700;
 const WASD_DIR  = { w: [0, 1], a: [1, 0], s: [0, -1], d: [-1, 0] };
 const heldKeys  = new Set();
 
@@ -1969,9 +1243,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (WASD_DIR[k]) heldKeys.add(k);
 });
-window.addEventListener('keyup', (e) => {
-  heldKeys.delete(e.key.toLowerCase());
-});
+window.addEventListener('keyup', (e) => heldKeys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => heldKeys.clear());
 
 let lastTick = null;
@@ -1979,7 +1251,6 @@ function panLoop(t) {
   if (lastTick === null) lastTick = t;
   const dt = (t - lastTick) / 1000;
   lastTick = t;
-
   if (heldKeys.size) {
     let dx = 0, dy = 0;
     for (const k of heldKeys) { dx += WASD_DIR[k][0]; dy += WASD_DIR[k][1]; }
@@ -1992,8 +1263,9 @@ function panLoop(t) {
 }
 requestAnimationFrame(panLoop);
 
-// ── 완성 토스트 ──
-document.addEventListener('sudoku:solved', () => {
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2400);
-});
+// ── 진행 중이던 데일리 자동 저장 (탭 닫기/새로고침) ──
+window.addEventListener('beforeunload', persistDailyNow);
+document.addEventListener('visibilitychange', () => { if (document.hidden) persistDailyNow(); });
+
+// ── 시작 ──
+refreshDailyCards();

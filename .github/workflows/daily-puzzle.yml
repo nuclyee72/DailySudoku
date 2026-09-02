@@ -1,0 +1,53 @@
+name: Daily puzzle
+
+on:
+  schedule:
+    # 15:00 UTC = 00:00 KST — 그 날의 KST 날짜로 퍼즐 생성
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: '시작 날짜 (YYYY-MM-DD, 비우면 KST 오늘)'
+        required: false
+        default: ''
+      days:
+        description: '생성할 일수'
+        required: false
+        default: '2'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-puzzle
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate daily puzzles
+        run: |
+          if [ -n "${{ github.event.inputs.start_date }}" ]; then
+            node scripts/generate-daily.mjs "${{ github.event.inputs.start_date }}" "${{ github.event.inputs.days || '2' }}"
+          else
+            node scripts/generate-daily.mjs
+          fi
+
+      - name: Commit new puzzles
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain daily/)" ]; then
+            git add daily/
+            git commit -m "daily: puzzles $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "새로 생성된 퍼즐 없음"
+          fi

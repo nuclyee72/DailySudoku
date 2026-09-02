@@ -6,6 +6,7 @@
 export const shapes = [
   { id: 'single', label: '단일 1개', boards: [{ row: 0, col: 0 }] },
   { id: 'pair_h', label: '가로 2개', boards: [{ row: 0, col: 0 }, { row: 0, col: 6 }] },
+  { id: 'pair_v', label: '세로 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 0 }] },
   { id: 'pair_diag', label: '대각 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 6 }] },
   { id: 'staircase3', label: '계단형 3개', boards: [{ row: 0, col: 0 }, { row: 6, col: 6 }, { row: 12, col: 12 }] },
   { id: 'row3', label: '가로 3개', boards: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 0, col: 12 }] },

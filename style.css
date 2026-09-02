@@ -2024,3 +2024,355 @@ kbd {
   font-weight: 600;
   color: var(--text-given);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   데일리 스도쿠 — 랜딩 카드 / 요소 사이드바 / 결과·통계 모달
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.landing-date {
+  margin: -20px 0 24px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(var(--text-given-rgb), 0.55);
+}
+
+.daily-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daily-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 16px 18px;
+  border: 1px solid rgba(var(--glass-rgb), 0.6);
+  border-radius: 16px;
+  background: var(--surface-solid);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 2px 6px rgba(20, 24, 40, 0.08);
+  transition: transform 0.08s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.daily-card:hover {
+  background: var(--surface-solid-hover);
+  box-shadow: 0 6px 16px rgba(20, 24, 40, 0.16);
+}
+
+.daily-card:active { transform: scale(0.98); }
+
+.daily-card-name {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.daily-card-desc {
+  font-size: 12px;
+  color: rgba(var(--text-given-rgb), 0.55);
+}
+
+.daily-card-status {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: rgba(var(--text-given-rgb), 0.6);
+}
+
+.daily-card-status[data-status="solved"]  { background: var(--cell-selected); color: var(--text-sel); }
+.daily-card-status[data-status="timeout"] { background: var(--surface-danger); color: var(--conflict); }
+.daily-card-status[data-status="playing"] { background: #fff3d6; color: #a9791d; }
+[data-theme="dark"] .daily-card-status[data-status="playing"] { background: #3a3320; color: #e0b24c; }
+
+.landing-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(var(--text-given-rgb), 0.55);
+}
+
+.landing-mini-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.landing-mini-btn {
+  flex: 1;
+  height: 38px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(var(--text-given-rgb), 0.6);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.landing-mini-btn:hover { background: var(--surface-1); color: var(--text-given); }
+
+/* 카운트다운 위험(1분 미만) */
+.timer-display.timer-danger {
+  color: var(--conflict);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* 요소 안내 사이드바 (책갈피) */
+.element-sidebar {
+  position: fixed;
+  top: 96px;
+  left: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  transform: translateX(calc(-1 * var(--sidebar-body-w, 260px)));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.element-sidebar.open { transform: translateX(0); }
+.element-sidebar[hidden] { display: none; }
+
+.element-sidebar-body {
+  --sidebar-body-w: 260px;
+  width: 260px;
+  padding: 18px 16px;
+  border-radius: 0 4px 4px 0;
+  background: rgba(var(--glass-rgb), 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(var(--glass-rgb), 0.6);
+  border-left: none;
+  box-shadow: 12px 0 40px rgba(20, 24, 40, 0.18);
+}
+
+.element-sidebar-handle {
+  order: 2;
+  align-self: stretch;
+  min-height: 92px;
+  padding: 12px 6px;
+  border: 1px solid rgba(var(--glass-rgb), 0.6);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  background: var(--text-input);
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  box-shadow: 6px 0 18px rgba(20, 24, 40, 0.16);
+}
+
+.element-sidebar-icons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.element-sidebar-title {
+  margin: 0 0 12px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.element-sidebar-list { display: flex; flex-direction: column; gap: 12px; }
+
+.element-sidebar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.element-sidebar-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.element-sidebar-item-head b { font-size: 16px; }
+
+.element-sidebar-item-head em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: rgba(var(--text-given-rgb), 0.55);
+}
+
+.element-sidebar-item-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(var(--text-given-rgb), 0.7);
+}
+
+[data-layout^="mobile"] .element-sidebar { top: 60px; }
+[data-layout^="mobile"] .element-sidebar,
+[data-layout^="mobile"] .element-sidebar-body { --sidebar-body-w: min(78vw, 260px); }
+[data-layout^="mobile"] .element-sidebar-body { width: min(78vw, 260px); }
+
+/* 데일리 결과 모달 */
+.daily-result-card { width: min(340px, calc(100vw - 32px)); text-align: center; }
+
+.daily-result-detail {
+  margin: 6px 0 16px;
+  font-size: 14px;
+  color: rgba(var(--text-given-rgb), 0.7);
+}
+
+.daily-result-grid {
+  margin: 0 auto 18px;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: 2px;
+  white-space: pre;
+}
+
+.daily-result-card .modal-actions { flex-wrap: wrap; }
+.daily-result-card .modal-btn { min-width: 84px; }
+
+.daily-share-note {
+  margin: 12px 0 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--text-input);
+}
+
+/* 데일리 통계 모달 */
+.daily-stats-card { width: min(360px, calc(100vw - 32px)); position: relative; }
+
+.daily-stats-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.daily-stats-tab {
+  flex: 1;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: rgba(var(--text-given-rgb), 0.6);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.daily-stats-tab.active { background: var(--text-input); color: #fff; }
+
+.daily-stats-numbers {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.daily-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.daily-stat strong {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.daily-stat span {
+  font-size: 10px;
+  color: rgba(var(--text-given-rgb), 0.55);
+  text-align: center;
+}
+
+.daily-stats-subtitle {
+  margin: 0 0 10px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.daily-stats-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+
+.dist-row { display: flex; align-items: center; gap: 8px; }
+
+.dist-label {
+  flex: 0 0 46px;
+  font-size: 11px;
+  color: rgba(var(--text-given-rgb), 0.6);
+  text-align: right;
+}
+
+.dist-bar-wrap { flex: 1; display: flex; }
+
+.dist-bar {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--text-input);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  transition: width 0.3s ease;
+}
+
+.dist-bar-fail { background: var(--conflict); }
+
+.daily-stats-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(var(--text-given-rgb), 0.12);
+}
+
+.daily-next { display: flex; flex-direction: column; gap: 2px; }
+
+.daily-next span { font-size: 11px; color: rgba(var(--text-given-rgb), 0.55); }
+
+.daily-next strong {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
+.daily-stats-footer .modal-btn { flex: 0 0 auto; min-width: 76px; height: 40px; }
+.daily-stats-footer .modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }

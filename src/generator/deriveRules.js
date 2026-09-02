@@ -10,7 +10,7 @@ import { Snake } from '../structures/Snake.js';
 import { Turntable } from '../structures/Turntable.js';
 import { pickSnakeWalk } from './snakeWalk.js';
 import { rotateGrid } from './gridRotate.js';
-import { shuffle, randInt } from './random.js';
+import { shuffle, randInt, nextFloat } from './random.js';
 
 function inRegion(region, row, col) {
   return row >= region.row && row < region.row + region.height &&
@@ -72,7 +72,7 @@ function pickTurntableOrigin(board, rule, reservedKeys) {
       if (allVisible) candidates.push({ row: r, col: c });
     }
   }
-  return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
+  return candidates.length ? candidates[Math.floor(nextFloat() * candidates.length)] : null;
 }
 
 /**

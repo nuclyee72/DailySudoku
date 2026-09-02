@@ -10,7 +10,7 @@
  * 존재하므로 getPeers()를 써도 안전 — 아직 inequality/consecutive/turntable 구조체가
  * board에 없음).
  */
-import { shuffle, randInt, pick } from './random.js';
+import { shuffle, randInt, pick, nextFloat } from './random.js';
 
 function key(row, col) { return `${row},${col}`; }
 
@@ -36,7 +36,7 @@ function weightedByCluster(scored) {
   const ordered = [];
   while (pool.length) {
     const total = pool.reduce((sum, p) => sum + p.weight, 0);
-    let r = Math.random() * total;
+    let r = nextFloat() * total;
     let idx = pool.findIndex(p => (r -= p.weight) <= 0);
     if (idx === -1) idx = pool.length - 1;
     ordered.push(pool.splice(idx, 1)[0].cell);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>변형 스도쿠</title>
+  <title>데일리 스도쿠</title>
   <link rel="stylesheet" href="style.css"/>
   <script>
     // body가 그려지기 전에 먼저 적용해서 라이트 테마가 잠깐 번쩍이는 걸 막는다
@@ -16,133 +16,40 @@
 </head>
 <body>
 
-  <!-- 랜딩 화면: 싱글플레이 / 멀티플레이 진입점 -->
+  <!-- 랜딩 화면: 데일리(스탠다드/익스텐디드) + 자유 연습 진입점 -->
   <div id="landing-screen" class="landing-screen">
     <div class="landing-card">
-      <h1 class="landing-title">변형 스도쿠</h1>
+      <h1 class="landing-title">데일리 스도쿠</h1>
+      <p id="landing-date" class="landing-date"></p>
 
       <div id="landing-main" class="landing-stack">
-        <button id="btn-landing-single" class="landing-btn landing-btn-primary" type="button">싱글플레이</button>
-        <button id="btn-landing-multi" class="landing-btn" type="button">멀티플레이</button>
-      </div>
+        <div id="daily-cards" class="daily-cards">
+          <button id="btn-daily-standard" class="daily-card" type="button" data-variant="standard">
+            <span class="daily-card-name">스탠다드</span>
+            <span class="daily-card-desc">겹친 2판 · 요소 없음</span>
+            <span class="daily-card-status" data-status="new">아직 안 함</span>
+          </button>
+          <button id="btn-daily-extended" class="daily-card" type="button" data-variant="extended">
+            <span class="daily-card-name">익스텐디드</span>
+            <span class="daily-card-desc">겹친 2판 · 요소 2개</span>
+            <span class="daily-card-status" data-status="new">아직 안 함</span>
+          </button>
+        </div>
 
-      <div id="landing-multi" class="landing-stack" hidden>
-        <button id="btn-mp-create" class="landing-btn landing-btn-primary" type="button">방 생성</button>
-        <button id="btn-mp-join" class="landing-btn" type="button">방 참가</button>
-        <button id="btn-mp-back" class="landing-back" type="button">‹ 뒤로</button>
-      </div>
+        <p id="daily-load-note" class="landing-note" hidden>오늘의 퍼즐을 불러오는 중...</p>
+        <p id="daily-error" class="landing-error"></p>
 
-      <div id="landing-create" class="landing-stack" hidden>
-        <div class="landing-field">
-          <label for="lc-nickname">닉네임</label>
-          <input id="lc-nickname" class="landing-input" type="text" maxlength="20" placeholder="닉네임 입력"/>
-        </div>
-        <div class="landing-field">
-          <label>게임 모드</label>
-          <div class="mode-toggle">
-            <button id="lc-mode-battle" class="mode-toggle-btn active" type="button" data-mode="battle">배틀</button>
-            <button id="lc-mode-coop" class="mode-toggle-btn" type="button" data-mode="coop">협동</button>
-          </div>
-        </div>
-        <div class="landing-field">
-          <label for="lc-max-players">참가자 수</label>
-          <input id="lc-max-players" class="landing-input" type="number" min="2" max="10" value="4"/>
-        </div>
-        <div class="landing-field">
-          <label>모양</label>
-          <div id="lc-shape-group" class="mode-toggle wrap"></div>
-        </div>
-        <div class="landing-field">
-          <label>요소</label>
-          <div id="lc-element-group" class="element-slider-group"></div>
-        </div>
-        <div class="landing-field">
-          <label>난이도</label>
-          <div id="lc-difficulty-group" class="mode-toggle"></div>
-        </div>
-        <p id="lc-error" class="landing-error"></p>
-        <button id="btn-lc-submit" class="landing-btn landing-btn-primary" type="button">방 생성</button>
-        <button id="btn-lc-back" class="landing-back" type="button">‹ 뒤로</button>
-      </div>
+        <button id="btn-free-play" class="landing-btn" type="button">자유 연습 (랜덤 생성)</button>
 
-      <div id="landing-join" class="landing-stack" hidden>
-        <div class="landing-field">
-          <label for="lj-nickname">닉네임</label>
-          <input id="lj-nickname" class="landing-input" type="text" maxlength="20" placeholder="닉네임 입력"/>
+        <div class="landing-mini-actions">
+          <button id="btn-landing-stats" class="landing-mini-btn" type="button">통계</button>
+          <button id="btn-landing-dark" class="landing-mini-btn" type="button">다크 모드</button>
         </div>
-        <div class="landing-field">
-          <label for="lj-code">방 코드</label>
-          <input id="lj-code" class="landing-input" type="text" inputmode="numeric" maxlength="4" placeholder="0000"/>
-        </div>
-        <p id="lj-error" class="landing-error"></p>
-        <button id="btn-lj-submit" class="landing-btn landing-btn-primary" type="button">참가</button>
-        <button id="btn-lj-back" class="landing-back" type="button">‹ 뒤로</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 대기실 화면 -->
-  <div id="waiting-room-screen" class="landing-screen waiting-room-screen hidden">
-    <div class="landing-card waiting-room-card">
-      <div class="wr-code-row">
-        <span class="wr-code-label">방 코드</span>
-        <span id="wr-code" class="wr-code">0000</span>
-        <button id="btn-wr-copy-code" class="wr-copy-btn" type="button">복사</button>
-      </div>
-
-      <div id="wr-body" class="wr-body">
-        <div class="wr-col">
-          <h2 class="wr-col-title">참가자</h2>
-          <div id="wr-player-list" class="wr-player-list"></div>
-        </div>
-        <div class="wr-col">
-          <h2 class="wr-col-title">게임 설정</h2>
-          <div class="landing-field">
-            <label>게임 모드</label>
-            <div class="mode-toggle">
-              <button id="wr-mode-battle" class="mode-toggle-btn" type="button" data-mode="battle">배틀</button>
-              <button id="wr-mode-coop" class="mode-toggle-btn" type="button" data-mode="coop">협동</button>
-            </div>
-          </div>
-          <div class="landing-field">
-            <label for="wr-max-players">참가자 수</label>
-            <input id="wr-max-players" class="landing-input" type="number" min="2" max="10"/>
-          </div>
-          <div class="landing-field">
-            <label>모양</label>
-            <div id="wr-shape-group" class="mode-toggle wrap"></div>
-          </div>
-          <div class="landing-field">
-            <label>요소</label>
-            <div id="wr-element-group" class="element-slider-group"></div>
-          </div>
-          <div class="landing-field">
-            <label>난이도</label>
-            <div id="wr-difficulty-group" class="mode-toggle"></div>
-          </div>
-          <p id="wr-readonly-note" class="wr-readonly-note" hidden>방장만 설정을 바꿀 수 있어요</p>
-        </div>
-      </div>
-
-      <div id="wr-starting" class="wr-starting" hidden>
-        <p class="landing-placeholder-text">게임 화면으로 이동 중입니다...</p>
-      </div>
-
-      <p id="wr-error" class="landing-error"></p>
-
-      <div class="wr-actions">
-        <button id="btn-wr-start" class="landing-btn landing-btn-primary" type="button" hidden>게임 시작</button>
-        <p id="wr-waiting-note" class="wr-waiting-note" hidden>방장이 시작하길 기다리는 중...</p>
-        <button id="btn-wr-leave" class="landing-back" type="button">나가기</button>
       </div>
     </div>
   </div>
 
   <div id="game-screen" class="game-screen hidden">
-
-  <!-- 그리기 모드 전용 입력면 - 게임판 밖(화면 전체)에서도 그리기를 시작할 수 있도록 뷰포트 전체를 덮는다.
-       그리기 모드가 꺼져 있을 땐 pointer-events:none이라 평소 화면 조작을 그대로 통과시킨다. -->
-  <div id="draw-overlay" class="draw-overlay"></div>
 
   <!-- 스도쿠 판 (패널 없이 판만 떠 있음) -->
   <div id="board-panel" class="board-panel">
@@ -152,64 +59,16 @@
     <div id="board-start-overlay" class="board-start-overlay">
       <button id="btn-start-timer" class="btn-start-timer" type="button">시작</button>
     </div>
-    <div id="battle-countdown-overlay" class="battle-countdown-overlay hidden">
-      <span id="battle-countdown-number" class="battle-countdown-number">3</span>
-    </div>
   </div>
 
-  <!-- 배틀 모드 리더보드 -->
-  <div id="battle-leaderboard" class="battle-leaderboard hidden">
-    <div class="leaderboard-room-code"><span>방 코드</span><strong id="battle-leaderboard-code"></strong></div>
-    <div id="battle-leaderboard-list" class="battle-leaderboard-list"></div>
-  </div>
-
-  <!-- 협동 모드 진행 현황 -->
-  <div id="coop-leaderboard" class="battle-leaderboard hidden">
-    <div class="leaderboard-room-code"><span>방 코드</span><strong id="coop-leaderboard-code"></strong></div>
-    <div id="coop-leaderboard-list" class="battle-leaderboard-list"></div>
-  </div>
-
-  <!-- 배틀 모드 종료 오버레이 -->
-  <div id="battle-ended-overlay" class="modal-overlay">
-    <div class="modal-card battle-ended-card">
-      <h2 class="floating-panel-title">게임 종료!</h2>
-      <div id="battle-ended-list" class="battle-leaderboard-list"></div>
-      <div class="modal-actions">
-        <button id="btn-battle-ended-continue" class="modal-btn modal-btn-cancel" type="button">대기실로</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 협동 모드 종료 오버레이 -->
-  <div id="coop-ended-overlay" class="modal-overlay">
-    <div class="modal-card battle-ended-card">
-      <h2 class="floating-panel-title">🎉 다같이 완성!</h2>
-      <div id="coop-ended-time" class="coop-ended-time"></div>
-      <div id="coop-ended-list" class="battle-leaderboard-list"></div>
-      <div class="modal-actions">
-        <button id="btn-coop-ended-continue" class="modal-btn modal-btn-cancel" type="button">대기실로</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 협동 모드 중지 투표 패널 - 도움말 창처럼 게임판을 막지 않는 떠있는 패널 -->
-  <div id="coop-vote-panel" class="floating-panel">
-    <button id="coop-vote-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
-    <h2 class="floating-panel-title">중지 투표</h2>
-    <div id="coop-vote-list" class="battle-leaderboard-list"></div>
-    <div class="modal-actions">
-      <button id="btn-coop-vote-disagree" class="modal-btn modal-btn-cancel" type="button">반대</button>
-      <button id="btn-coop-vote-agree" class="modal-btn modal-btn-primary" type="button">찬성</button>
-    </div>
-  </div>
-
-  <!-- 답지 패널 - 도움말/저장 패널과 같은 방식의 떠있는 패널 -->
-  <div id="answer-sheet-panel" class="floating-panel">
-    <button id="answer-sheet-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
-    <h2 class="floating-panel-title">답지</h2>
-    <div class="answer-sheet-actions">
-      <button id="btn-answer-check" class="answer-sheet-btn" type="button">정답 체크</button>
-      <button id="btn-answer-reveal" class="answer-sheet-btn" type="button">정답 보기</button>
+  <!-- 요소 안내 사이드바 (책갈피) — 데일리 익스텐디드에서만 표시 -->
+  <div id="element-sidebar" class="element-sidebar" hidden>
+    <button id="element-sidebar-handle" class="element-sidebar-handle" type="button" aria-label="요소 안내 열기/닫기">
+      <span id="element-sidebar-icons" class="element-sidebar-icons"></span>
+    </button>
+    <div class="element-sidebar-body">
+      <h2 class="element-sidebar-title">이 퍼즐의 요소</h2>
+      <div id="element-sidebar-list" class="element-sidebar-list"></div>
     </div>
   </div>
 
@@ -227,9 +86,7 @@
             <button id="btn-toggle-dark-mode" class="kp-extra-btn" type="button">다크 모드</button>
             <button id="btn-open-help" class="kp-extra-btn" type="button">도움말</button>
           </div>
-          <button id="btn-open-puzzle" class="kp-extra-btn kp-extra-pinned" type="button">퍼즐 선택</button>
           <button id="btn-open-generate" class="kp-extra-btn kp-extra-pinned" type="button">자동 생성</button>
-          <button id="btn-coop-stop-vote" class="kp-extra-btn kp-extra-pinned hidden" type="button">중지 투표</button>
           <button id="btn-go-landing" class="kp-extra-btn kp-extra-home" type="button">메인 화면으로</button>
         </div>
       </div>
@@ -238,15 +95,10 @@
       <div class="kp-body">
         <div id="timer-display" class="timer-display">00:00.00</div>
         <div id="keypad-grid" class="kp-grid"></div>
-        <div class="kp-reset-row">
-          <button id="btn-toggle-draw" class="kp-reset-all kp-reset-half kp-draw-toggle" type="button" aria-label="그리기 (E)">그리기</button>
-          <button id="btn-clear-draw" class="kp-reset-all kp-reset-half" type="button">그림 지우기</button>
-        </div>
         <div class="kp-sep"></div>
         <div class="kp-reset-row kp-reset-row-clear">
-          <button id="btn-clear-my-notes" class="kp-reset-all kp-reset-half" type="button">내 메모 지우기</button>
-          <button id="btn-reset-mine" class="kp-reset-all kp-reset-half hidden" type="button">내 숫자 지우기</button>
-          <button id="btn-reset-all" class="kp-reset-all kp-reset-all-join" type="button">모두 지우기</button>
+          <button id="btn-clear-my-notes" class="kp-reset-all kp-reset-half" type="button">메모 지우기</button>
+          <button id="btn-reset-all" class="kp-reset-all kp-reset-half" type="button">모두 지우기</button>
         </div>
       </div>
     </div>
@@ -296,13 +148,6 @@
     </div>
   </div>
 
-  <!-- 퍼즐 선택 패널 -->
-  <div id="puzzle-panel" class="floating-panel">
-    <button id="puzzle-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
-    <h2 class="floating-panel-title">퍼즐 선택</h2>
-    <div id="puzzle-list" class="puzzle-list"></div>
-  </div>
-
   <!-- 자동 생성 패널 -->
   <div id="generate-panel" class="floating-panel">
     <button id="generate-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
@@ -321,6 +166,16 @@
         <div id="gen-difficulty-group" class="mode-toggle"></div>
       </div>
       <button id="btn-generate-submit" type="button" class="landing-btn landing-btn-primary">생성하기</button>
+    </div>
+  </div>
+
+  <!-- 답지 패널 -->
+  <div id="answer-sheet-panel" class="floating-panel">
+    <button id="answer-sheet-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
+    <h2 class="floating-panel-title">답지</h2>
+    <div class="answer-sheet-actions">
+      <button id="btn-answer-check" class="answer-sheet-btn" type="button">정답 체크</button>
+      <button id="btn-answer-reveal" class="answer-sheet-btn" type="button">정답 보기</button>
     </div>
   </div>
 
@@ -356,6 +211,49 @@
           <li class="help-rule-item"><span class="help-rule-label">턴테이블</span><span class="help-rule-desc">3x3~4x4 영역을 90도씩 돌릴 수 있는 판 — 돌리면 숫자·초기 제공 칸·메모가 함께 회전함.</span></li>
         </ul>
       </div>
+    </div>
+  </div>
+
+  <!-- 데일리 결과 모달 -->
+  <div id="daily-result-modal" class="modal-overlay">
+    <div class="modal-card daily-result-card">
+      <h2 id="daily-result-title" class="floating-panel-title">결과</h2>
+      <p id="daily-result-detail" class="daily-result-detail"></p>
+      <div id="daily-result-grid" class="daily-result-grid"></div>
+      <div class="modal-actions">
+        <button id="btn-daily-result-share" class="modal-btn modal-btn-primary" type="button">공유</button>
+        <button id="btn-daily-result-stats" class="modal-btn modal-btn-cancel" type="button">통계</button>
+        <button id="btn-daily-result-close" class="modal-btn modal-btn-cancel" type="button">닫기</button>
+      </div>
+      <p id="daily-share-note" class="daily-share-note"></p>
+    </div>
+  </div>
+
+  <!-- 데일리 통계 모달 -->
+  <div id="daily-stats-modal" class="modal-overlay">
+    <div class="modal-card daily-stats-card">
+      <button id="daily-stats-close" class="floating-panel-close" type="button" aria-label="닫기">✕</button>
+      <h2 class="floating-panel-title">통계</h2>
+      <div class="daily-stats-tabs">
+        <button class="daily-stats-tab active" data-variant="standard" type="button">스탠다드</button>
+        <button class="daily-stats-tab" data-variant="extended" type="button">익스텐디드</button>
+      </div>
+      <div class="daily-stats-numbers">
+        <div class="daily-stat"><strong id="stat-played">0</strong><span>게임</span></div>
+        <div class="daily-stat"><strong id="stat-winrate">0</strong><span>승률(%)</span></div>
+        <div class="daily-stat"><strong id="stat-streak">0</strong><span>현재 연승</span></div>
+        <div class="daily-stat"><strong id="stat-maxstreak">0</strong><span>최고 연승</span></div>
+      </div>
+      <h3 class="daily-stats-subtitle">완성 시간 분포</h3>
+      <div id="daily-stats-dist" class="daily-stats-dist"></div>
+      <div class="daily-stats-footer">
+        <div class="daily-next">
+          <span>다음 데일리까지</span>
+          <strong id="daily-next-countdown">--:--:--</strong>
+        </div>
+        <button id="btn-daily-stats-share" class="modal-btn modal-btn-primary" type="button">공유</button>
+      </div>
+      <p id="daily-stats-share-note" class="daily-share-note"></p>
     </div>
   </div>
 

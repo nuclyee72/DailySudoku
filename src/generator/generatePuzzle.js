@@ -13,6 +13,7 @@ import {
 import { carveGivens } from './carveGivens.js';
 import { relaxTurntableAmbiguity } from './turntableAmbiguity.js';
 import { restoreRatioFor } from './composeTemplate.js';
+import { nextFloat } from './random.js';
 
 const MAX_ATTEMPTS = 20;
 // 보드 개수/규칙이 많은 조합은 시도당 소요 시간 편차가 커서(특히 fillRandomSolution이
@@ -123,7 +124,7 @@ async function tryGenerate(template) {
   }
 
   return {
-    id: `${template.id}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    id: `${template.id}-${Math.floor(nextFloat() * 1e9).toString(36)}`,
     name: template.label,
     structures: board.structures,
     givens,
