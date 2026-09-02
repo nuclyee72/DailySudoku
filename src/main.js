@@ -24,7 +24,7 @@ import {
   recordResult, summarize, DIST_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
-import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL, elementBracket } from './daily/share.js';
+import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL } from './daily/share.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -965,12 +965,7 @@ function showDailyResult(status, elapsedMs) {
 
   const pct = dailyRun ? completionPct(board, dailyRun.solutionMap) : 0;
   const mark = status === 'solved' ? '✅' : '❌';
-  let detail = `${fmtMinSec(elapsedMs)} · ${pct}% ${mark}`;
-  if (variant === 'extended' && dailyRun?.elements) {
-    const bracket = elementBracket([dailyRun.elements.main, dailyRun.elements.sub]);
-    if (bracket) detail += ` ${bracket}`;
-  }
-  dailyResultDetail.textContent = detail;
+  dailyResultDetail.textContent = `${fmtMinSec(elapsedMs)} · ${pct}% ${mark}`;
 
   dailyResultGrid.textContent = dailyRun
     ? buildShareGrid(board, dailyRun.solutionMap, dailyRun.shape).join('\n')
@@ -988,7 +983,6 @@ function currentShareText() {
     variant: dailyRun.variant,
     status: prog?.status ?? 'timeout',
     elapsedMs: prog?.elapsedMs ?? DAILY_LIMIT_MS,
-    elements: dailyRun.elements,
     board,
     solutionMap: dailyRun.solutionMap,
     shape: dailyRun.shape,
@@ -1088,7 +1082,6 @@ btnDailyStatsShare.addEventListener('click', async () => {
   const solMap = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
   const text = buildShareText({
     date: TODAY(), variant: statsVariant, status: prog.status, elapsedMs: prog.elapsedMs,
-    elements: statsVariant === 'extended' ? vd.elements : null,
     board: tmp, solutionMap: solMap, shape: data.shape, url: SITE_URL,
   });
   shareText(text, dailyStatsShareNote);
