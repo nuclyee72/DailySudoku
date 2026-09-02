@@ -21,7 +21,7 @@ import { layoutMode, isMobile, onLayoutChange } from './ui/layoutMode.js';
 import { dateStrKST, shiftDateStr, msUntilNextKSTMidnight, formatCountdown } from './daily/dateUtil.js';
 import {
   DAILY_LIMIT_MS, loadProgress, saveProgress, patchProgressCells,
-  recordResult, summarize, DIST_BUCKETS,
+  recordResult, summarize, DIST_BUCKETS, FAIL_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
 import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL } from './daily/share.js';
@@ -869,13 +869,14 @@ function endDaily(status) {
   const elapsedMs = dailyRun.startedAt
     ? Math.min(DAILY_LIMIT_MS, Date.now() - dailyRun.startedAt)
     : DAILY_LIMIT_MS;
+  const pct = completionPct(board, dailyRun.solutionMap);
 
   saveProgress({
     date: dailyRun.date, variant: dailyRun.variant,
     startedAt: dailyRun.startedAt, status,
     cells: board.serialize(), elapsedMs, finishedAt: Date.now(),
   });
-  recordResult(dailyRun.variant, dailyRun.date, status, elapsedMs);
+  recordResult(dailyRun.variant, dailyRun.date, status, elapsedMs, pct);
   refreshDailyCards();
   showDailyResult(status, elapsedMs);
 }
@@ -1047,7 +1048,7 @@ function renderStatsModal() {
     const barWrap = document.createElement('span');
     barWrap.className = 'dist-bar-wrap';
     const bar = document.createElement('span');
-    bar.className = 'dist-bar' + (i === DIST_BUCKETS.length - 1 ? ' dist-bar-fail' : '');
+    bar.className = 'dist-bar' + (i >= DIST_BUCKETS.length - FAIL_BUCKETS ? ' dist-bar-fail' : '');
     bar.style.width = `${(count / max) * 100}%`;
     bar.textContent = count;
     barWrap.appendChild(bar);

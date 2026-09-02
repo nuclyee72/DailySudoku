@@ -41,30 +41,39 @@ export function patchProgressCells(date, variant, cells) {
 
 // ── 통계 ──
 
-/** { results: { [date]: { status: 'solved'|'timeout', elapsedMs } } } */
+/** { results: { [date]: { status: 'solved'|'timeout'|'gaveup', elapsedMs, pct } } } */
 export function loadStats(variant) {
   const s = readJSON(STATS_KEY(variant));
   return s && s.results ? s : { results: {} };
 }
 
-/** 하루의 결과를 1회만 기록 (이미 기록돼 있으면 무시) */
-export function recordResult(variant, date, status, elapsedMs) {
+/** 하루의 결과를 1회만 기록 (이미 기록돼 있으면 무시). pct = 완성률(%) — 실패 구간 분류에 씀 */
+export function recordResult(variant, date, status, elapsedMs, pct = 0) {
   const s = loadStats(variant);
   if (s.results[date]) return s;
-  s.results[date] = { status, elapsedMs };
+  s.results[date] = { status, elapsedMs, pct };
   writeJSON(STATS_KEY(variant), s);
   return s;
 }
 
 // ── 집계 (통계창) ──
 
-// 10분 미만은 한 칸("~10분"), 10분부터는 1분 간격, 마지막은 실패(타임아웃/도중종료).
-// DIST_BUCKETS.length === BUCKET_EDGES_MIN.length + 1 을 항상 유지할 것.
+// 정답: 10분 미만 한 칸("~10분") + 10~15분 1분 간격 6칸.
+// 실패: 완성률을 25% 간격 4칸으로(타임아웃/도중종료 시 얼마나 채웠는지).
+// DIST_BUCKETS.length === BUCKET_EDGES_MIN.length + FAIL_BUCKETS 를 항상 유지할 것.
 const BUCKET_EDGES_MIN = [10, 11, 12, 13, 14, 15];
-export const DIST_BUCKETS = ['~10분', '10–11분', '11–12분', '12–13분', '13–14분', '14–15분', '실패'];
+export const FAIL_BUCKETS = 4;
+export const DIST_BUCKETS = [
+  '~10분', '10–11분', '11–12분', '12–13분', '13–14분', '14–15분',
+  '❌ ~25%', '❌ ~50%', '❌ ~75%', '❌ ~100%',
+];
 
-export function bucketIndexFor(status, elapsedMs) {
-  if (status !== 'solved') return DIST_BUCKETS.length - 1; // 실패
+export function bucketIndexFor(status, elapsedMs, pct = 0) {
+  const solvedBuckets = DIST_BUCKETS.length - FAIL_BUCKETS;
+  if (status !== 'solved') {
+    const q = Math.min(FAIL_BUCKETS - 1, Math.max(0, Math.floor((pct || 0) / 25)));
+    return solvedBuckets + q;
+  }
   const min = elapsedMs / 60000;
   for (let i = 0; i < BUCKET_EDGES_MIN.length; i++) {
     if (min < BUCKET_EDGES_MIN[i]) return i;
@@ -85,7 +94,7 @@ export function summarize(variant, todayStr) {
   for (const d of dates) {
     const r = results[d];
     if (r.status === 'solved') wins++;
-    distribution[bucketIndexFor(r.status, r.elapsedMs)]++;
+    distribution[bucketIndexFor(r.status, r.elapsedMs, r.pct)]++;
   }
 
   // 최고 연승: 날짜가 하루씩 이어지면서 solved인 최장 구간

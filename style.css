@@ -2378,10 +2378,11 @@ kbd {
 .dist-row { display: flex; align-items: center; gap: 8px; }
 
 .dist-label {
-  flex: 0 0 46px;
+  flex: 0 0 56px;
   font-size: 11px;
   color: rgba(var(--text-given-rgb), 0.6);
   text-align: right;
+  white-space: nowrap;
 }
 
 .dist-bar-wrap { flex: 1; display: flex; }
