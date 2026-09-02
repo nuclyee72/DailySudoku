@@ -125,7 +125,7 @@ const calShareNote       = document.getElementById('cal-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.8'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.9'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -809,7 +809,8 @@ async function runStartDaily(variant) {
 
   // 데일리에선 저장/불러오기/답지/자동생성 숨김 (워들식 — 힌트·재생성 불가)
   setFreePlayControls(false);
-  btnDailyAbort.classList.toggle('hidden', dailyRun.ended);
+  // 도중 종료는 "시작" 이후에만 (시작 전엔 '메인 화면으로'로 나가면 됨)
+  btnDailyAbort.classList.toggle('hidden', dailyRun.ended || !dailyRun.startedAt);
   renderElementSidebar(dailyRun);
 
   timerEnabled = false;
@@ -853,6 +854,7 @@ function beginDailyTimer() {
   setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
+  btnDailyAbort.classList.remove('hidden'); // 시작했으니 이제 도중 종료 가능
   saveProgress({
     date: dailyRun.date, variant: dailyRun.variant,
     startedAt: dailyRun.startedAt, status: 'playing',
@@ -949,11 +951,8 @@ btnDailyStandard.addEventListener('click', () => startDaily('standard'));
 btnDailyExtended.addEventListener('click', () => startDaily('extended'));
 
 btnDailyAbort.addEventListener('click', () => {
-  if (!dailyRun || dailyRun.ended) return;
-  if (!dailyRun.startedAt) {
-    askConfirm('시작하지 않고 메인 화면으로 나갈까요?', () => { exitDailyMode(); enterLanding(); });
-    return;
-  }
+  // 시작 전엔 버튼 자체가 숨겨져 있으므로 여기 오면 항상 진행 중
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
   askConfirm('지금 종료할까요?<br/>이 판은 <b>실패</b>로 기록되고 오늘은 다시 풀 수 없어요.', () => endDaily('gaveup'));
 });
 
