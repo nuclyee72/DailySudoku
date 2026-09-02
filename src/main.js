@@ -127,6 +127,14 @@ let dailyRun = null;       // { date, variant, elements, shape, solutionMap, dea
 let dailyCountdownRAF = null;
 let dailyPersistTimer = null;
 
+// 보드 잠금 — 값 입력은 아래 키패드/키보드 호출부가 이 값으로 막고, 렌더러 내부
+// 상호작용(턴테이블 회전)은 renderer.inputLocked로 막는다. 둘을 항상 같이 바꾼다.
+let boardLocked = false;
+function setBoardLocked(v) {
+  boardLocked = v;
+  renderer.inputLocked = v;
+}
+
 // ── 답지 (정답 체크 / 정답 보기) 상태 ──
 let currentPuzzleStructures = board.structures;
 let currentPuzzleGivens = [];
@@ -134,33 +142,40 @@ let currentPuzzleSolution = null; // [{row,col,value}] — 생성기/데일리 J
 let cachedSolution = null;        // "r,c" -> value Map
 let solvingPromise = null;
 
+// 요소 책갈피(사이드바)가 떠 있으면 왼쪽에 그만큼 공간을 비워 손잡이가 판 위 칸을
+// 가리지 않게 한다 (책갈피는 화면 왼쪽 끝 고정, 손잡이 40px + 여유).
+function sidebarPad() {
+  return elementSidebar && !elementSidebar.hidden ? 48 : 0;
+}
+
 // ── 초기 배치: 화면에 맞게 축소 후 중앙 정렬 ──
 function fitAndCenterBoard() {
   const naturalW = parseFloat(svg.getAttribute('width'))  || 0;
   const naturalH = parseFloat(svg.getAttribute('height')) || 0;
+  const pad = sidebarPad();
 
   if (layoutMode === 'mobile-portrait') {
     const kpH    = keypadPanel.getBoundingClientRect().height;
-    const availW = window.innerWidth * 0.92;
+    const availW = window.innerWidth * 0.92 - pad;
     const availH = Math.max(120, window.innerHeight - kpH - 24);
     const fit = Math.min(1, availW / naturalW, availH / naturalH);
     renderer.setScale(fit);
     const scaledW = naturalW * fit;
     const scaledH = naturalH * fit;
-    boardPanel.style.left = `${Math.round((window.innerWidth - scaledW) / 2)}px`;
+    boardPanel.style.left = `${Math.max(pad, Math.round(pad + (window.innerWidth - pad - scaledW) / 2))}px`;
     boardPanel.style.top  = `${Math.round((window.innerHeight - kpH - scaledH) / 2)}px`;
     return;
   }
 
   if (layoutMode === 'mobile-landscape') {
     const kpW    = keypadPanel.getBoundingClientRect().width;
-    const availW = Math.max(120, window.innerWidth - kpW - 16);
+    const availW = Math.max(120, window.innerWidth - kpW - 16 - pad);
     const availH = window.innerHeight * 0.94;
     const fit = Math.min(1, availW / naturalW, availH / naturalH);
     renderer.setScale(fit);
     const scaledW = naturalW * fit;
     const scaledH = naturalH * fit;
-    boardPanel.style.left = `${Math.round((window.innerWidth - kpW - scaledW) / 2)}px`;
+    boardPanel.style.left = `${Math.max(pad, Math.round(pad + (window.innerWidth - kpW - pad - scaledW) / 2))}px`;
     boardPanel.style.top  = `${Math.round((window.innerHeight - scaledH) / 2)}px`;
     return;
   }
@@ -171,7 +186,7 @@ function fitAndCenterBoard() {
   renderer.setScale(fit);
   const scaledW = naturalW * fit;
   const scaledH = naturalH * fit;
-  boardPanel.style.left = `${Math.round((window.innerWidth - scaledW) / 2 - 130)}px`;
+  boardPanel.style.left = `${Math.max(pad, Math.round((window.innerWidth - scaledW) / 2 - 130))}px`;
   boardPanel.style.top  = `${Math.round((window.innerHeight - scaledH) / 2)}px`;
 }
 
@@ -433,8 +448,7 @@ function mountBoard(structures, givens) {
   renderer.loadBoard(board);
   fitAndCenterBoard();
   renderer.selectFirstCell();
-  clearAllSaveSlots();
-  refreshSaveSlots();
+  refreshSaveSlots(); // 슬롯 비우기는 "자동 생성"에서만 (데일리 진입이 자유 연습 저장을 지우면 안 됨)
 
   currentPuzzleStructures = structures;
   currentPuzzleGivens = givens;
@@ -616,6 +630,8 @@ async function runGenerate(template) {
   try {
     const puzzle = await generatePuzzle(template);
     mountBoard(puzzle.structures, puzzle.givens);
+    clearAllSaveSlots(); // 새 퍼즐 — 이전 퍼즐 기준으로 저장된 슬롯은 더 이상 유효하지 않음
+    refreshSaveSlots();
     currentPuzzleSolution = puzzle.solution ?? null;
     if (timerEnabled) armTimer();
   } catch (err) {
@@ -699,9 +715,10 @@ function refreshDailyCards() {
   for (const [variant, btn] of [['standard', btnDailyStandard], ['extended', btnDailyExtended]]) {
     const badge = btn.querySelector('.daily-card-status');
     const p = loadProgress(TODAY(), variant);
+    const expired = p && p.status === 'playing' && p.startedAt && Date.now() > p.startedAt + DAILY_LIMIT_MS;
     if (!p) { badge.textContent = '아직 안 함'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
-    else if (p.status === 'timeout' || p.status === 'gaveup') { badge.textContent = '❌ 실패'; badge.dataset.status = 'timeout'; }
+    else if (p.status === 'timeout' || p.status === 'gaveup' || expired) { badge.textContent = '❌ 실패'; badge.dataset.status = 'timeout'; }
     else { badge.textContent = '진행 중'; badge.dataset.status = 'playing'; }
   }
 }
@@ -711,7 +728,16 @@ function fmtMMSS(ms) {
   return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }
 
+let dailyStarting = false;
 async function startDaily(variant) {
+  // 로드가 비동기라 카드를 빠르게 두 번 누르면 보드를 이중 마운트할 수 있다 — 동기 플래그로 막는다.
+  if (dailyStarting || (dailyRun && !dailyRun.ended)) return;
+  dailyStarting = true;
+  try { await runStartDaily(variant); }
+  finally { dailyStarting = false; }
+}
+
+async function runStartDaily(variant) {
   dailyErrorEl.textContent = '';
   dailyLoadNote.hidden = false;
   let data;
@@ -761,7 +787,7 @@ async function startDaily(variant) {
 
   if (dailyRun.ended) {
     // 이미 끝난 판 — 잠금만, 블러는 없이(최종 보드가 보이게) 결과 모달
-    boardLocked = true;
+    setBoardLocked(true);
     boardWrapper.classList.remove('blurred');
     boardStartOverlay.classList.remove('show');
     setTimerText(prog.status === 'solved' ? fmtMMSS(prog.elapsedMs) : '00:00');
@@ -773,13 +799,13 @@ async function startDaily(variant) {
     // 진행 중이던 판 재개
     const remaining = dailyRun.deadlineTs - Date.now();
     if (remaining <= 0) { endDaily('timeout'); return; }
-    boardLocked = false;
+    setBoardLocked(false);
     boardWrapper.classList.remove('blurred');
     boardStartOverlay.classList.remove('show');
     startDailyCountdown();
   } else {
     // 아직 시작 전 — 블러 + "시작" 오버레이
-    boardLocked = true;
+    setBoardLocked(true);
     boardWrapper.classList.add('blurred');
     boardStartOverlay.classList.add('show');
     setTimerText(formatCountdown(DAILY_LIMIT_MS).slice(3)); // MM:SS
@@ -790,7 +816,7 @@ function beginDailyTimer() {
   if (!dailyRun || dailyRun.startedAt) return;
   dailyRun.startedAt = Date.now();
   dailyRun.deadlineTs = dailyRun.startedAt + DAILY_LIMIT_MS;
-  boardLocked = false;
+  setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
   saveProgress({
@@ -836,7 +862,7 @@ function endDaily(status) {
   stopDailyCountdown();
   clearTimeout(dailyPersistTimer);
   btnDailyAbort.classList.add('hidden');
-  boardLocked = true;
+  setBoardLocked(true);
   boardWrapper.classList.remove('blurred'); // 끝난 뒤엔 최종 보드가 그대로 보이게
   setTimerDanger(false);
 
@@ -863,7 +889,11 @@ function exitDailyMode() {
   btnDailyAbort.classList.add('hidden');
   setTimerDanger(false);
   setTimerShown(false);
-  boardLocked = false;
+  // 자유 연습 타이머 상태도 초기화 — 안 그러면 "타이머 켬 → 시작 안 하고 나가기 →
+  // 자유 연습 재진입" 시 버튼은 켜진 채 표시만 숨겨진 상태로 어긋난다.
+  timerEnabled = false;
+  timerToggleBtn.classList.remove('active');
+  disarmTimer();
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
   setFreePlayControls(true);
@@ -1087,7 +1117,6 @@ async function copyText(text) {
 // ── 타이머 (자유 연습: 위로 세는 연습 타이머) ──
 let timerEnabled   = false;
 let timerRunning   = false;
-let boardLocked    = false;
 let timerElapsedMs = 0;
 let timerStartedAt = 0;
 let timerRAF       = null;
@@ -1117,7 +1146,7 @@ function armTimer() {
   timerElapsedMs = 0;
   stopTimerFrame();
   renderTimerDisplay();
-  boardLocked = true;
+  setBoardLocked(true);
   boardWrapper.classList.add('blurred');
   boardStartOverlay.classList.add('show');
 }
@@ -1125,7 +1154,7 @@ function disarmTimer() {
   timerRunning = false;
   timerElapsedMs = 0;
   stopTimerFrame();
-  boardLocked = false;
+  setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
 }
@@ -1142,7 +1171,7 @@ timerToggleBtn.addEventListener('click', () => {
 btnStartTimer.addEventListener('click', () => {
   if (dailyRun && !dailyRun.ended) { beginDailyTimer(); return; }
   if (!timerEnabled || timerRunning) return;
-  boardLocked = false;
+  setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
   timerRunning = true;
@@ -1259,7 +1288,10 @@ const WASD_DIR  = { w: [0, 1], a: [1, 0], s: [0, -1], d: [-1, 0] };
 const heldKeys  = new Set();
 
 window.addEventListener('keydown', (e) => {
-  if (!isGameActive() || confirmModal.classList.contains('show') || isFloatingPanelOpen()) return;
+  if (!isGameActive() || isFloatingPanelOpen()) return;
+  if (confirmModal.classList.contains('show')
+    || dailyResultModal.classList.contains('show')
+    || dailyStatsModal.classList.contains('show')) return;
   const k = e.key.toLowerCase();
   if (WASD_DIR[k]) heldKeys.add(k);
 });

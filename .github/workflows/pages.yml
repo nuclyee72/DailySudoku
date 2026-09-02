@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   deploy:
+    # "Daily puzzle" 트리거는 그 실행이 성공했을 때만 (실패/무변경 재배포 방지)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

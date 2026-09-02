@@ -29,6 +29,7 @@ export class BoardRenderer {
     this.scale = 1;
     this.onCellSelect = null;
     this.noteMode = false; // true면 숫자 입력이 실제 값이 아닌 메모(후보 숫자)로 기록됨
+    this.inputLocked = false; // true면 턴테이블 회전 등 렌더러 내부 상호작용을 막는다(값 입력은 호출부가 boardLocked로 막음)
 
     /**
      * 설정돼 있으면(협동 모드) 값 입력이 로컬로 반영되는 대신 이 함수로만 위임되고,
@@ -606,6 +607,7 @@ export class BoardRenderer {
   }
 
   _startTurntableDrag(e, structure, centerX, centerY, radius, handle, handleHit, cross) {
+    if (this.inputLocked) return; // 게임 종료/시작 전 — 회전 금지
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation(); // 보드 패닝(DragPanel)이 같이 시작되지 않도록 차단

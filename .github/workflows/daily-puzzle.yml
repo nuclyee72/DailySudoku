@@ -13,7 +13,7 @@ on:
       days:
         description: '생성할 일수'
         required: false
-        default: '2'
+        default: '4'
 
 permissions:
   contents: write
@@ -35,7 +35,7 @@ jobs:
       - name: Generate daily puzzles
         run: |
           if [ -n "${{ github.event.inputs.start_date }}" ]; then
-            node scripts/generate-daily.mjs "${{ github.event.inputs.start_date }}" "${{ github.event.inputs.days || '2' }}"
+            node scripts/generate-daily.mjs "${{ github.event.inputs.start_date }}" "${{ github.event.inputs.days || '4' }}"
           else
             node scripts/generate-daily.mjs
           fi
@@ -44,10 +44,21 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain daily/)" ]; then
-            git add daily/
-            git commit -m "daily: puzzles $(date -u +%Y-%m-%d)"
-            git push
-          else
+          if [ -z "$(git status --porcelain daily/)" ]; then
             echo "새로 생성된 퍼즐 없음"
+            exit 0
+          fi
+          git add daily/
+          git commit -m "daily: puzzles $(date -u +%Y-%m-%d)"
+          # 사이에 다른 push(예: main 배포)가 끼면 non-fast-forward로 거절되므로 rebase 후 재시도
+          pushed=0
+          for i in 1 2 3 4 5; do
+            if git push; then pushed=1; break; fi
+            echo "push 거절됨 — rebase 후 재시도 ($i/5)"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            sleep 5
+          done
+          if [ "$pushed" != "1" ]; then
+            echo "::error::daily 퍼즐 커밋 push 실패"
+            exit 1
           fi

@@ -1,7 +1,7 @@
 /**
  * generate-daily.mjs — 데일리 퍼즐(스탠다드/익스텐디드)을 생성해 daily/<date>.json 으로 저장.
  *
- *   node scripts/generate-daily.mjs                # KST 오늘 + 내일
+ *   node scripts/generate-daily.mjs                # KST 오늘 + 앞으로 3일 (버퍼)
  *   node scripts/generate-daily.mjs 2026-09-02     # 특정 날짜
  *   node scripts/generate-daily.mjs 2026-09-02 5   # 2026-09-02 부터 5일치
  *
@@ -66,7 +66,8 @@ async function generateForDate(dateStr) {
 async function main() {
   const [arg1, arg2] = process.argv.slice(2);
   const startDate = arg1 || dateStrKST();
-  const count = arg1 ? (Number(arg2) || 1) : 2; // 인자 없으면 오늘+내일
+  // 인자 없으면 오늘 + 앞으로 3일치를 미리 만든다 — 크론이 하루이틀 밀리거나 스킵돼도 버틴다.
+  const count = arg1 ? (Number(arg2) || 1) : 4;
 
   let wrote = 0;
   for (let i = 0; i < count; i++) {
