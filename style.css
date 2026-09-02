@@ -2182,9 +2182,14 @@ kbd {
 
 .element-bookmark-handle {
   order: 2;
-  align-self: stretch;
-  min-height: 76px;
-  padding: 10px 7px;
+  flex: 0 0 auto;
+  /* 모든 책갈피 손잡이를 동일한 고정 크기로 — 이모지/글자 폭 차이로 크기가 달라지지 않게 */
+  width: 40px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 1px solid rgba(var(--glass-rgb), 0.6);
   border-left: none;
   border-radius: 0 12px 12px 0;
@@ -2193,12 +2198,14 @@ kbd {
   box-shadow: 6px 0 18px rgba(20, 24, 40, 0.16);
 }
 
-.element-bookmark:nth-child(2) .element-bookmark-handle { background: var(--snake-default); }
-
 .element-bookmark-icon {
-  display: block;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
-  font-size: 19px;
+  font-size: 16px;
   line-height: 1;
 }
 

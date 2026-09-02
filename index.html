@@ -73,6 +73,7 @@
       <div id="kp-extra-menu" class="kp-extra-menu">
         <div class="kp-extra-content">
           <div id="kp-extra-scroll" class="kp-extra-scroll">
+            <button id="btn-open-stats" class="kp-extra-btn" type="button">통계</button>
             <button id="btn-open-save" class="kp-extra-btn" type="button">저장 / 불러오기</button>
             <button id="btn-toggle-timer" class="kp-extra-btn" type="button">타이머</button>
             <button id="btn-open-answer-sheet" class="kp-extra-btn" type="button">답지</button>
@@ -101,17 +102,6 @@
   <!-- 완성 토스트 -->
   <div id="toast" class="toast">🎉 퍼즐 완성!</div>
   <div id="generate-status" class="toast">🎲 생성 중...</div>
-
-  <!-- 확인 모달 (모두 지우기 / 불러오기 / 퍼즐 변경 등 공용) -->
-  <div id="confirm-modal" class="modal-overlay">
-    <div class="modal-card">
-      <p id="confirm-text" class="modal-text"></p>
-      <div class="modal-actions">
-        <button id="confirm-cancel" class="modal-btn modal-btn-cancel" type="button">취소</button>
-        <button id="confirm-ok" class="modal-btn modal-btn-danger" type="button">확인</button>
-      </div>
-    </div>
-  </div>
 
   <!-- 저장 / 불러오기 패널 -->
   <div id="save-panel" class="floating-panel">
@@ -208,6 +198,21 @@
     </div>
   </div>
 
+  </div><!-- /#game-screen -->
+
+  <!-- ── 모달: 랜딩·게임 어디서든 뜰 수 있어야 하므로 #game-screen 밖에 둔다 ── -->
+
+  <!-- 확인 모달 (모두 지우기 / 불러오기 / 도중 종료 등 공용) -->
+  <div id="confirm-modal" class="modal-overlay">
+    <div class="modal-card">
+      <p id="confirm-text" class="modal-text"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="modal-btn modal-btn-cancel" type="button">취소</button>
+        <button id="confirm-ok" class="modal-btn modal-btn-danger" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 데일리 결과 모달 -->
   <div id="daily-result-modal" class="modal-overlay">
     <div class="modal-card daily-result-card">
@@ -250,8 +255,6 @@
       <p id="daily-stats-share-note" class="daily-share-note"></p>
     </div>
   </div>
-
-  </div><!-- /#game-screen -->
 
   <script type="module" src="src/main.js"></script>
 </body>

@@ -24,7 +24,7 @@ import {
   recordResult, summarize, DIST_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
-import { buildShareText, buildShareGrid } from './daily/share.js';
+import { buildShareText, buildShareGrid, completionPct } from './daily/share.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -44,6 +44,7 @@ const confirmCancel  = document.getElementById('confirm-cancel');
 const btnOpenGenerate = document.getElementById('btn-open-generate');
 const btnOpenSave     = document.getElementById('btn-open-save');
 const btnOpenHelp     = document.getElementById('btn-open-help');
+const btnOpenStats    = document.getElementById('btn-open-stats');
 const generatePanel   = document.getElementById('generate-panel');
 const savePanel       = document.getElementById('save-panel');
 const helpPanel       = document.getElementById('help-panel');
@@ -916,28 +917,18 @@ function renderElementSidebar(run) {
 }
 
 // ── 데일리 결과 모달 ──
-function computeCompletionPct() {
-  if (!dailyRun) return 0;
-  let total = 0, correct = 0;
-  const sol = dailyRun.solutionMap;
-  for (const cell of board.getVisibleCells()) {
-    const key = `${cell.row},${cell.col}`;
-    if (cell.isGiven || !sol.has(key)) continue;
-    total++;
-    if (cell.value === sol.get(key)) correct++;
-  }
-  return total ? Math.round((correct / total) * 100) : 0;
+function fmtMinSec(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}분 ${t % 60}초`;
 }
 
 function showDailyResult(status, elapsedMs) {
-  const isWin = status === 'solved';
   dailyResultTitle.textContent =
     status === 'solved' ? '🎉 클리어!' :
     status === 'gaveup' ? '🚪 도중 종료' :
     '⏱ 타임아웃';
-  dailyResultDetail.textContent = isWin
-    ? `${fmtMMSS(elapsedMs)} 만에 완성`
-    : `${computeCompletionPct()}% 완성`;
+  const pct = dailyRun ? completionPct(board, dailyRun.solutionMap) : 0;
+  dailyResultDetail.textContent = `${fmtMinSec(elapsedMs)} · ${pct}%`;
 
   dailyResultGrid.textContent = dailyRun
     ? buildShareGrid(board, dailyRun.solutionMap, dailyRun.shape).join('\n')
@@ -1039,6 +1030,7 @@ document.querySelectorAll('.daily-stats-tab').forEach((t) => {
 dailyStatsClose.addEventListener('click', closeStatsModal);
 dailyStatsModal.addEventListener('click', (e) => { if (e.target === dailyStatsModal) closeStatsModal(); });
 btnLandingStats.addEventListener('click', () => openStatsModal('standard'));
+btnOpenStats.addEventListener('click', () => openStatsModal(dailyRun?.variant ?? statsVariant));
 
 btnDailyStatsShare.addEventListener('click', async () => {
   const prog = loadProgress(TODAY(), statsVariant);
@@ -1185,8 +1177,7 @@ document.addEventListener('sudoku:solved', () => {
 const ARROW_DIR = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
 window.addEventListener('keydown', (e) => {
-  if (!isGameActive()) return;
-
+  // 통계/결과 모달은 랜딩에서도 뜰 수 있으므로 게임 화면 여부와 무관하게 먼저 처리
   if (dailyStatsModal.classList.contains('show')) {
     if (e.key === 'Escape') closeStatsModal();
     return;
@@ -1195,6 +1186,8 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePanel(dailyResultModal);
     return;
   }
+
+  if (!isGameActive()) return;
 
   if (confirmModal.classList.contains('show')) {
     if (e.key === 'Escape') cancelConfirm();
@@ -1281,6 +1274,19 @@ requestAnimationFrame(panLoop);
 // ── 진행 중이던 데일리 자동 저장 (탭 닫기/새로고침) ──
 window.addEventListener('beforeunload', persistDailyNow);
 document.addEventListener('visibilitychange', () => { if (document.hidden) persistDailyNow(); });
+
+// ── 테스트용: 콘솔에서 __resetDaily() 로 오늘 기록·진행상태를 지우고 새로고침 ──
+//    __resetDaily(true) 면 통계(연승 등)까지 전부 삭제.
+window.__resetDaily = (wipeStats = false) => {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('dsudoku:progress:') || (wipeStats && key.startsWith('dsudoku:stats:'))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* 무시 */ }
+  location.reload();
+};
 
 // ── 시작 ──
 refreshDailyCards();

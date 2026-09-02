@@ -2,14 +2,20 @@
  * share.js — 데일리 결과 공유 텍스트 + 3x3 박스 정답률 이모지 그리드.
  *
  * 그리드: 퍼즐의 각 3x3 박스마다 "비-기본칸 중 정답과 일치하는 비율"을 5단계 색(각 20%)으로.
- *   0–20% ⬜ · 20–40% 🟨 · 40–60% 🟧 · 60–80% 🟩 · 80–100% 🟦 · (전부 기본칸) ⬛
+ *   0–20% ⬛ · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
+ *
+ * 공유 텍스트 형식:
+ *   12분 34초 · 100% ✅ ‹ 🐍      (요소는 이모지만, 스탠다드는 이모지 없음)
+ *   (빈 줄)
+ *   <그리드>
+ *   (빈 줄)
+ *   <링크>
  */
 import { ELEMENT_INFO } from './elementInfo.js';
 
-const TIER_EMOJI = ['⬜', '🟨', '🟧', '🟩', '🟦'];
-const ALL_GIVEN_EMOJI = '⬛';
-
-const VARIANT_LABEL = { standard: '스탠다드', extended: '익스텐디드' };
+const TIER_EMOJI = ['⬛', '🟫', '🟧', '🟨', '🟩'];
+const ALL_GIVEN_EMOJI = '⬜';
+const GAP = '　'; // 전각 공백 — 겹치지 않은 박스 자리
 
 /** 퍼즐에 존재하는 유일한 3x3 박스 원점들 (겹친 판이면 공유 박스는 1개로) */
 function boxOrigins(shape) {
@@ -23,6 +29,18 @@ function boxOrigins(shape) {
     }
   }
   return [...set.values()];
+}
+
+/** 비-기본칸 중 정답과 일치하는 비율(%) — 결과창·공유 공용 */
+export function completionPct(board, solutionMap) {
+  let total = 0, correct = 0;
+  for (const cell of board.getVisibleCells()) {
+    const key = `${cell.row},${cell.col}`;
+    if (cell.isGiven || !solutionMap.has(key)) continue;
+    total++;
+    if (cell.value === solutionMap.get(key)) correct++;
+  }
+  return total ? Math.round((correct / total) * 100) : 0;
 }
 
 /**
@@ -41,12 +59,12 @@ export function buildShareGrid(board, solutionMap, shape) {
   for (const br of boxRows) {
     let line = '';
     for (const bc of boxCols) {
-      if (!present.has(`${br},${bc}`)) { line += '　'; continue; } // 전각 공백으로 빈자리
+      if (!present.has(`${br},${bc}`)) { line += GAP; continue; }
       let total = 0, correct = 0;
       for (let r = br; r < br + 3; r++) {
         for (let c = bc; c < bc + 3; c++) {
           const key = `${r},${c}`;
-          if (!solutionMap.has(key)) continue; // 턴테이블 칸 등
+          if (!solutionMap.has(key)) continue;
           const cell = board.getCell(r, c);
           if (!cell || cell.isGiven) continue;
           total++;
@@ -62,25 +80,26 @@ export function buildShareGrid(board, solutionMap, shape) {
   return lines;
 }
 
-/** 데일리 결과 공유용 전체 텍스트 */
-export function buildShareText({ date, variant, status, elapsedMs, elements, board, solutionMap, shape, url }) {
-  const mmss = (ms) => {
-    const t = Math.max(0, Math.floor(ms / 1000));
-    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-  };
-  const head = `데일리 스도쿠 ${date} · ${VARIANT_LABEL[variant] ?? variant}`;
-  const result = status === 'solved'
-    ? `⏱️ ${mmss(elapsedMs)} / 20:00  ✅`
-    : status === 'gaveup'
-      ? `🚪 도중 종료  ❌`
-      : `⏱️ 타임아웃 (20:00)  ❌`;
+function formatMinSec(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}분 ${t % 60}초`;
+}
 
-  const parts = [head, result];
+/** 데일리 결과 공유용 전체 텍스트 */
+export function buildShareText({ variant, status, elapsedMs, elements, board, solutionMap, shape, url }) {
+  const pct = completionPct(board, solutionMap);
+  const mark = status === 'solved' ? '✅' : '❌';
+
+  let line1 = `${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
   if (variant === 'extended' && elements) {
-    const tag = (k) => `${ELEMENT_INFO[k]?.icon ?? ''} ${ELEMENT_INFO[k]?.label ?? k}`;
-    parts.push(`${tag(elements.main)} · ${tag(elements.sub)}`);
+    const icons = [elements.main, elements.sub]
+      .map((k) => ELEMENT_INFO[k]?.icon)
+      .filter(Boolean)
+      .join(' ');
+    if (icons) line1 += ` ${icons}`;
   }
-  parts.push(...buildShareGrid(board, solutionMap, shape));
+
+  const parts = [line1, '', ...buildShareGrid(board, solutionMap, shape), ''];
   if (url) parts.push(url);
   return parts.join('\n');
 }
