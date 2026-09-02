@@ -716,10 +716,10 @@ function refreshDailyCards() {
     const badge = btn.querySelector('.daily-card-status');
     const p = loadProgress(TODAY(), variant);
     const expired = p && p.status === 'playing' && p.startedAt && Date.now() > p.startedAt + DAILY_LIMIT_MS;
-    if (!p) { badge.textContent = '아직 안 함'; badge.dataset.status = 'new'; }
+    if (!p) { badge.textContent = '플레이 전'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
     else if (p.status === 'timeout' || p.status === 'gaveup' || expired) { badge.textContent = '❌ 실패'; badge.dataset.status = 'timeout'; }
-    else { badge.textContent = '진행 중'; badge.dataset.status = 'playing'; }
+    else { badge.textContent = '플레이 중'; badge.dataset.status = 'playing'; }
   }
 }
 
