@@ -78,6 +78,7 @@ const btnDailyExtended   = document.getElementById('btn-daily-extended');
 const dailyLoadNote      = document.getElementById('daily-load-note');
 const dailyErrorEl       = document.getElementById('daily-error');
 const btnFreePlay        = document.getElementById('btn-free-play');
+const btnArchive         = document.getElementById('btn-archive');
 const btnLandingStats    = document.getElementById('btn-landing-stats');
 const btnLandingDark     = document.getElementById('btn-landing-dark');
 const btnGoLanding       = document.getElementById('btn-go-landing');
@@ -109,8 +110,15 @@ const dailyNextCountdown  = document.getElementById('daily-next-countdown');
 const btnDailyStatsShare = document.getElementById('btn-daily-stats-share');
 const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
+const archiveModal       = document.getElementById('archive-modal');
+const archiveClose       = document.getElementById('archive-close');
+const archiveDateInput   = document.getElementById('archive-date');
+const archiveErrorEl     = document.getElementById('archive-error');
+const btnArchivePlay     = document.getElementById('btn-archive-play');
+
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
-const APP_VERSION = '1.0.6'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
+const APP_VERSION = '1.0.7'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -691,6 +699,64 @@ btnFreePlay.addEventListener('click', () => {
   mountBoard(createStandardSudokuStructures(0, 0), []);
   enterGame();
   openFloatingPanel(generatePanel);
+});
+
+// ── 지난 퍼즐 아카이브 (연습용 — dailyRun 없이 자유 연습처럼, 기록 반영 안 함) ──
+let archiveVariant = 'standard';
+
+function openArchiveModal() {
+  archiveErrorEl.textContent = '';
+  const yesterday = shiftDateStr(TODAY(), -1);
+  archiveDateInput.min = DAILY_FIRST_DATE;
+  archiveDateInput.max = yesterday;
+  const v = archiveDateInput.value;
+  if (!v || v < DAILY_FIRST_DATE || v > yesterday) archiveDateInput.value = yesterday;
+  document.querySelectorAll('.archive-type').forEach((b) => {
+    b.classList.toggle('active', b.dataset.variant === archiveVariant);
+  });
+  openPanel(archiveModal);
+}
+function closeArchiveModal() { closePanel(archiveModal); }
+
+btnArchive.addEventListener('click', openArchiveModal);
+archiveClose.addEventListener('click', closeArchiveModal);
+archiveModal.addEventListener('click', (e) => { if (e.target === archiveModal) closeArchiveModal(); });
+document.querySelectorAll('.archive-type').forEach((b) => {
+  b.addEventListener('click', () => {
+    archiveVariant = b.dataset.variant;
+    document.querySelectorAll('.archive-type').forEach((x) => x.classList.toggle('active', x === b));
+  });
+});
+
+btnArchivePlay.addEventListener('click', async () => {
+  const dateStr = archiveDateInput.value;
+  const yesterday = shiftDateStr(TODAY(), -1);
+  if (!dateStr || dateStr < DAILY_FIRST_DATE || dateStr > yesterday) {
+    archiveErrorEl.textContent = `${DAILY_FIRST_DATE} ~ ${yesterday} 사이 날짜를 골라주세요.`;
+    return;
+  }
+  btnArchivePlay.disabled = true;
+  archiveErrorEl.textContent = '';
+  let data;
+  try {
+    data = await fetchDaily(dateStr);
+  } catch {
+    btnArchivePlay.disabled = false;
+    archiveErrorEl.textContent = '그 날짜의 퍼즐을 찾을 수 없어요.';
+    return;
+  }
+  btnArchivePlay.disabled = false;
+
+  const vd = data[archiveVariant];
+  exitDailyMode(); // 데일리/타이머 상태 정리 + 자유 연습 컨트롤 on
+  mountBoard(reviveStructures(vd.structures), vd.givens);
+  currentPuzzleSolution = vd.solution ?? null;
+  cachedSolution = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
+  if (archiveVariant === 'extended' && vd.elements) {
+    renderElementSidebar({ variant: 'extended', elements: vd.elements });
+  }
+  closeArchiveModal();
+  enterGame();
 });
 
 btnGoLanding.addEventListener('click', () => {
@@ -1329,6 +1395,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (dailyResultModal.classList.contains('show')) {
     if (e.key === 'Escape') closePanel(dailyResultModal);
+    return;
+  }
+  if (archiveModal.classList.contains('show')) {
+    if (e.key === 'Escape') closeArchiveModal();
     return;
   }
 

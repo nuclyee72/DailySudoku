@@ -174,6 +174,56 @@ html, body {
   background: var(--text-sel);
 }
 
+.landing-row { display: flex; gap: 10px; }
+.landing-row .landing-btn { flex: 1; min-width: 0; font-size: 16px; }
+
+/* ── 지난 퍼즐 아카이브 모달 ── */
+.archive-card { width: min(330px, calc(100vw - 32px)); position: relative; text-align: left; }
+.archive-note {
+  margin: 4px 0 18px;
+  font-size: 12px;
+  color: rgba(var(--text-given-rgb), 0.55);
+}
+.archive-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+.archive-field > label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(var(--text-given-rgb), 0.7);
+}
+.archive-type-toggle { display: flex; gap: 6px; }
+.archive-type {
+  flex: 1;
+  height: 38px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: rgba(var(--text-given-rgb), 0.6);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.archive-type.active { background: var(--text-input); color: #fff; }
+.archive-date-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(var(--text-given-rgb), 0.14);
+  border-radius: 12px;
+  background: var(--surface-solid);
+  color: var(--text-given);
+  font-family: inherit;
+  font-size: 14px;
+  color-scheme: light;
+}
+[data-theme="dark"] .archive-date-input { color-scheme: dark; }
+.archive-error {
+  margin: 2px 0 12px;
+  min-height: 14px;
+  font-size: 12px;
+  color: var(--conflict);
+}
+.archive-card .landing-btn { width: 100%; height: 46px; font-size: 15px; box-shadow: none; }
+
 .landing-back {
   margin-top: 6px;
   border: none;
