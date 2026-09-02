@@ -2140,6 +2140,38 @@ kbd {
   50% { opacity: 0.55; }
 }
 
+/* ── 모바일 타이머 배지 — 우상단에 작게. 데스크톱은 키패드 안 #timer-display 그대로 ── */
+.timer-badge { display: none; }
+
+[data-layout^="mobile"] .timer-display { display: none !important; }
+
+[data-layout^="mobile"] .timer-badge.show {
+  display: block;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 8px);
+  z-index: 46;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(var(--glass-rgb), 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--glass-rgb), 0.6);
+  box-shadow: 0 4px 14px rgba(20, 24, 40, 0.18);
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  color: var(--text-given);
+  pointer-events: none;
+}
+
+[data-layout^="mobile"] .timer-badge.timer-danger {
+  color: var(--conflict);
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
 /* 요소 안내 사이드바 (책갈피) — 요소마다 독립 책갈피 하나씩, 각자 펼침/접힘 */
 .element-sidebar {
   position: fixed;

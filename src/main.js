@@ -58,6 +58,7 @@ const btnGenerateSubmit  = document.getElementById('btn-generate-submit');
 
 const timerToggleBtn    = document.getElementById('btn-toggle-timer');
 const timerDisplay      = document.getElementById('timer-display');
+const timerBadge        = document.getElementById('timer-badge');
 const boardWrapper      = document.querySelector('.board-wrapper');
 const boardStartOverlay = document.getElementById('board-start-overlay');
 const btnStartTimer     = document.getElementById('btn-start-timer');
@@ -111,6 +112,12 @@ let board = new Board();
 board.addStructures(createStandardSudokuStructures(0, 0));
 
 const renderer = new BoardRenderer(svg, board);
+
+// ── 타이머 표시 — 데스크톱은 키패드 안(#timer-display), 모바일은 우상단 배지(#timer-badge).
+//    CSS가 레이아웃에 맞는 쪽만 보여주므로 여기선 둘 다에 똑같이 반영한다. ──
+function setTimerText(t)      { timerDisplay.textContent = t; timerBadge.textContent = t; }
+function setTimerShown(on)    { timerDisplay.classList.toggle('show', on); timerBadge.classList.toggle('show', on); }
+function setTimerDanger(on)   { timerDisplay.classList.toggle('timer-danger', on); timerBadge.classList.toggle('timer-danger', on); }
 
 // 데일리 상태 — renderer.onCellSelect가 모듈 초기화 중 동기적으로 처음 불릴 때 참조하므로
 // (renderer.selectFirstCell), 그 전에 반드시 선언돼 있어야 한다(TDZ 방지).
@@ -748,7 +755,7 @@ async function startDaily(variant) {
   timerEnabled = false;
   timerToggleBtn.classList.remove('active');
   disarmTimer();
-  timerDisplay.classList.add('show');
+  setTimerShown(true);
 
   enterGame();
 
@@ -757,7 +764,7 @@ async function startDaily(variant) {
     boardLocked = true;
     boardWrapper.classList.remove('blurred');
     boardStartOverlay.classList.remove('show');
-    timerDisplay.textContent = prog.status === 'solved' ? fmtMMSS(prog.elapsedMs) : '00:00';
+    setTimerText(prog.status === 'solved' ? fmtMMSS(prog.elapsedMs) : '00:00');
     showDailyResult(prog.status, prog.elapsedMs);
     return;
   }
@@ -775,7 +782,7 @@ async function startDaily(variant) {
     boardLocked = true;
     boardWrapper.classList.add('blurred');
     boardStartOverlay.classList.add('show');
-    timerDisplay.textContent = formatCountdown(DAILY_LIMIT_MS).slice(3); // MM:SS
+    setTimerText(formatCountdown(DAILY_LIMIT_MS).slice(3)); // MM:SS
   }
 }
 
@@ -801,8 +808,8 @@ function startDailyCountdown() {
     const remaining = dailyRun.deadlineTs - Date.now();
     if (remaining <= 0) { endDaily('timeout'); return; }
     const t = Math.floor(remaining / 1000);
-    timerDisplay.textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-    timerDisplay.classList.toggle('timer-danger', remaining < 60000);
+    setTimerText(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+    setTimerDanger(remaining < 60000);
     dailyCountdownRAF = requestAnimationFrame(frame);
   };
   frame();
@@ -831,7 +838,7 @@ function endDaily(status) {
   btnDailyAbort.classList.add('hidden');
   boardLocked = true;
   boardWrapper.classList.remove('blurred'); // 끝난 뒤엔 최종 보드가 그대로 보이게
-  timerDisplay.classList.remove('timer-danger');
+  setTimerDanger(false);
 
   const elapsedMs = dailyRun.startedAt
     ? Math.min(DAILY_LIMIT_MS, Date.now() - dailyRun.startedAt)
@@ -854,7 +861,8 @@ function exitDailyMode() {
   elementSidebar.hidden = true;
   elementSidebar.innerHTML = '';
   btnDailyAbort.classList.add('hidden');
-  timerDisplay.classList.remove('timer-danger', 'show');
+  setTimerDanger(false);
+  setTimerShown(false);
   boardLocked = false;
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
@@ -1095,7 +1103,7 @@ function formatTimer(ms) {
 
 function renderTimerDisplay() {
   const current = timerElapsedMs + (timerRunning ? performance.now() - timerStartedAt : 0);
-  timerDisplay.textContent = formatTimer(current);
+  setTimerText(formatTimer(current));
 }
 function timerFrame() {
   renderTimerDisplay();
@@ -1126,7 +1134,7 @@ timerToggleBtn.addEventListener('click', () => {
   if (dailyRun) return;
   timerEnabled = !timerEnabled;
   timerToggleBtn.classList.toggle('active', timerEnabled);
-  timerDisplay.classList.toggle('show', timerEnabled);
+  setTimerShown(timerEnabled);
   if (timerEnabled) armTimer();
   else disarmTimer();
 });
