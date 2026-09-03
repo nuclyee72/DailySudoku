@@ -745,7 +745,7 @@ export class BoardRenderer {
     this._updateBoardGlow();
   }
 
-  /** 선택 칸이 속한 9x9 판마다, 테두리 밖으로 점점 연해지는 초록 글로우 */
+  /** 선택 칸이 속한 9x9 판마다, 테두리 밖으로 퍼지는 초록 글로우 하나 */
   _updateBoardGlow() {
     const g = this._gBoardGlow;
     if (!g) return;
@@ -758,29 +758,22 @@ export class BoardRenderer {
       sel.row >= s.originRow && sel.row < s.originRow + 9 &&
       sel.col >= s.originCol && sel.col < s.originCol + 9);
 
-    const LAYERS = [
-      { grow: 2,  width: 3, opacity: 0.45 },
-      { grow: 7,  width: 4, opacity: 0.24 },
-      { grow: 14, width: 6, opacity: 0.11 },
-      { grow: 23, width: 8, opacity: 0.045 },
-    ];
     for (const gr of grids) {
       const x0 = this._px(gr.originCol), y0 = this._py(gr.originRow);
-      const w = 9 * CELL, h = 9 * CELL;
-      for (const L of LAYERS) {
-        const r = this._el('rect');
-        r.setAttribute('x', x0 - L.grow);
-        r.setAttribute('y', y0 - L.grow);
-        r.setAttribute('width',  w + L.grow * 2);
-        r.setAttribute('height', h + L.grow * 2);
-        r.setAttribute('rx', 5 + L.grow);
-        r.setAttribute('fill', 'none');
-        r.setAttribute('stroke', 'var(--text-input)');
-        r.setAttribute('stroke-width', L.width);
-        r.setAttribute('opacity', L.opacity);
-        r.setAttribute('pointer-events', 'none');
-        g.appendChild(r);
-      }
+      const grow = 7;
+      const r = this._el('rect');
+      r.setAttribute('x', x0 - grow);
+      r.setAttribute('y', y0 - grow);
+      r.setAttribute('width',  9 * CELL + grow * 2);
+      r.setAttribute('height', 9 * CELL + grow * 2);
+      r.setAttribute('rx', 5 + grow);
+      r.setAttribute('fill', 'none');
+      r.setAttribute('stroke', 'var(--text-input)');
+      r.setAttribute('stroke-width', 7);
+      r.setAttribute('opacity', 0.55);
+      r.setAttribute('pointer-events', 'none');
+      r.style.filter = 'blur(6px)'; // 한 겹이지만 밖으로 부드럽게 번짐
+      g.appendChild(r);
     }
   }
 
