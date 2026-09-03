@@ -2,9 +2,10 @@
  * share.js — 데일리 결과 공유 텍스트 + 3x3 박스 정답률 이모지 그리드.
  *
  * 그리드: 퍼즐의 각 3x3 박스마다 "비-기본칸 중 정답과 일치하는 비율"을 5단계 색(각 20%)으로.
- *   0–20% ⬛ · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
- *   겹치지 않은 자리는 이모지가 아니라 "앞쪽 공백(칸당 5칸) + 뒤쪽 잘라내기"로 처리한다.
- *   (대각 모양이 계단처럼 들여쓰기됨. 이모지-공백 폭이 완전히 같진 않아 앱에 따라 살짝 밀릴 수 있음)
+ *   0–20% 🟥 · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
+ *   겹치지 않은(판 없는) 자리 = ⬛. 공백 대신 이모지로 채워야 앱마다 폭이 안 어긋난다
+ *   (공백과 이모지의 폭 비율이 앱/폰트마다 달라 정렬이 절대 안 맞음). ⬛는 최하위 등급과 겹치지
+ *   않게 최하위를 🟥로 옮겼다.
  *
  * 공유 텍스트 형식 (결과창 제목/상세와 같은 2줄 구성):
  *   2026-09-02 · 익스텐디드
@@ -16,9 +17,9 @@
  */
 export const VARIANT_LABEL = { standard: '스탠다드', extended: '익스텐디드' };
 
-const TIER_EMOJI = ['⬛', '🟫', '🟧', '🟨', '🟩'];
+const TIER_EMOJI = ['🟥', '🟫', '🟧', '🟨', '🟩'];
 const ALL_GIVEN_EMOJI = '⬜';
-const GAP_SPACES = 5; // 겹치지 않은 박스 한 칸 = 공백 5칸
+const GAP = '⬛'; // 판이 없는 자리 — 공백은 앱마다 폭이 달라 정렬이 안 맞으므로 이모지로 채운다
 
 /** 퍼즐에 존재하는 유일한 3x3 박스 원점들 (겹친 판이면 공유 박스는 1개로) */
 function boxOrigins(shape) {
@@ -58,11 +59,11 @@ export function buildShareGrid(board, solutionMap, shape) {
   const boxCols = [...new Set(origins.map((o) => o.col))].sort((a, b) => a - b);
   const present = new Set(origins.map((o) => `${o.row},${o.col}`));
 
-  const gap = ' '.repeat(GAP_SPACES);
   const lines = [];
   for (const br of boxRows) {
-    const cells = boxCols.map((bc) => {
-      if (!present.has(`${br},${bc}`)) return null;
+    let line = '';
+    for (const bc of boxCols) {
+      if (!present.has(`${br},${bc}`)) { line += GAP; continue; }
       let total = 0, correct = 0;
       for (let r = br; r < br + 3; r++) {
         for (let c = bc; c < bc + 3; c++) {
@@ -74,14 +75,9 @@ export function buildShareGrid(board, solutionMap, shape) {
           if (cell.value === solutionMap.get(key)) correct++;
         }
       }
-      if (total === 0) return ALL_GIVEN_EMOJI;
-      return TIER_EMOJI[Math.min(4, Math.floor((correct / total) * 5))];
-    });
-    // 뒤쪽 빈칸은 잘라내고, 앞·중간 빈칸만 공백으로 (대각 모양이 계단처럼 들여쓰기됨)
-    let last = cells.length - 1;
-    while (last >= 0 && cells[last] === null) last--;
-    let line = '';
-    for (let i = 0; i <= last; i++) line += cells[i] === null ? gap : cells[i];
+      if (total === 0) { line += ALL_GIVEN_EMOJI; continue; }
+      line += TIER_EMOJI[Math.min(4, Math.floor((correct / total) * 5))];
+    }
     lines.push(line);
   }
   return lines;
