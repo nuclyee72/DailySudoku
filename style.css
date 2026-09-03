@@ -183,15 +183,19 @@ html, body {
 .archive-back {
   align-self: flex-start;
   border: none;
-  background: none;
-  padding: 2px 0;
-  color: rgba(var(--text-given-rgb), 0.6);
+  padding: 8px 16px 8px 12px;
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text-given);
   font-family: 'Outfit', 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(20, 24, 40, 0.08);
+  transition: transform 0.08s ease, background 0.15s ease;
 }
-.archive-back:hover { color: var(--text-given); }
+.archive-back:hover { background: var(--surface-1-hover); }
+.archive-back:active { transform: scale(0.96); }
 
 .archive-note {
   margin: 0;
