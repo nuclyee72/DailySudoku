@@ -18,25 +18,51 @@ import { getShape } from '../src/generator/shapes.js';
 import { generatePuzzle } from '../src/generator/generatePuzzle.js';
 import { solveBoard } from '../src/generator/solveBoard.js';
 import { reviveStructures } from '../src/puzzles/reviveStructures.js';
+import { Board } from '../src/core/Board.js';
+import { Validator } from '../src/core/Validator.js';
 import { dailySelections, dailySeed } from '../src/daily/dailyConfig.js';
 import { dateStrKST, shiftDateStr } from '../src/daily/dateUtil.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DAILY_DIR = path.join(__dirname, '..', 'daily');
 
+/** 생성된 퍼즐이 실제로 멀쩡한지 — givens 충돌 0, 저장 solution 이 모든 규칙 만족·완성, 백트래킹 유일해 */
+function puzzleIsSound(puzzle) {
+  const structs = reviveStructures(puzzle.structures);
+
+  // 1) givens 만으로 충돌이 없어야 한다
+  const gb = new Board(); gb.addStructures(structs); gb.loadGivens(puzzle.givens);
+  Validator.validate(gb);
+  if (gb.getVisibleCells().some((c) => c.isConflict)) return 'givens 충돌';
+
+  // 2) 저장된 solution(턴테이블 칸 제외)을 채우면 — 충돌 0, isSolved, 모든 규칙 통과
+  const sb = new Board(); sb.addStructures(reviveStructures(puzzle.structures)); sb.loadGivens(puzzle.givens);
+  for (const s of puzzle.solution) { const c = sb.getCell(s.row, s.col); if (c) c.value = s.value; }
+  Validator.validate(sb);
+  if (sb.getVisibleCells().some((c) => c.isConflict)) return 'solution 충돌';
+  if (!sb.isSolved()) return 'solution 미완성';
+  for (const st of sb.structures) {
+    if (st.type === 'snake') continue; // 스네이크는 렌더러 외곽선으로 따로 검사
+    if ((st.validate(sb) ?? []).length) return `규칙 위반(${st.type})`;
+  }
+  return null;
+}
+
 /**
- * 생성 → 백트래킹 솔버로 "저장된 solution 과 유일하게 일치하는지" 검증 → 아니면 시드 바꿔 재시도.
- * generatePuzzle 내부의 유일해 검사(countSolutions)가 턴테이블+겹침 조합에서 가끔 놓치는 걸 여기서 잡는다.
+ * 생성 → 검증(위 puzzleIsSound + 백트래킹 솔버로 저장 solution 과 유일 일치) → 아니면 시드 바꿔 재시도.
  */
-async function generateVerified(seed, selection, tries = 10) {
+async function generateVerified(seed, selection, tries = 12) {
   for (let i = 0; i < tries; i++) {
     seedRng(i === 0 ? seed : `${seed}:r${i}`);
     const puzzle = await generatePuzzle(buildTemplateFromSelection(selection));
-    const sol = await solveBoard(reviveStructures(puzzle.structures), puzzle.givens);
-    if (sol && puzzle.solution.every((s) => sol.get(`${s.row},${s.col}`) === s.value)) return puzzle;
-    console.log(`  ⚠ ${seed} (${i + 1}/${tries}): 유일해 아님 — 시드 바꿔 재시도`);
+    const flaw = puzzleIsSound(puzzle);
+    if (!flaw) {
+      const sol = await solveBoard(reviveStructures(puzzle.structures), puzzle.givens);
+      if (sol && puzzle.solution.every((s) => sol.get(`${s.row},${s.col}`) === s.value)) return puzzle;
+    }
+    console.log(`  ⚠ ${seed} (${i + 1}/${tries}): ${flaw || '유일해 아님'} — 시드 바꿔 재시도`);
   }
-  throw new Error(`${seed}: 유일해 퍼즐을 못 만듦`);
+  throw new Error(`${seed}: 멀쩡한 퍼즐을 못 만듦`);
 }
 
 async function generateForDate(dateStr) {
