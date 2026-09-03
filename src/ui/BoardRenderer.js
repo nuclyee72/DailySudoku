@@ -100,14 +100,16 @@ export class BoardRenderer {
     this._turntableUIStructure = null;
 
     this._drawCells();
+    // 선택 칸이 속한 9x9 판 테두리 글로우 — 칸 배경 위, 숫자 아래
+    this._gBoardGlow = this._g('g-board-glow');
+    this._gBoardGlow.setAttribute('pointer-events', 'none');
+    this.svg.appendChild(this._gBoardGlow);
     this._drawTurntableCrosses(); // 칸 배경보다 위, 숫자보다 아래
     this.svg.appendChild(this._gCellsFg);
     this._drawThinLines();
     this._drawBoxBorders();
     this._drawGridBorders();
     this._drawTurntableRings();
-
-    this.svg.appendChild(this._gConflicts);
 
     // 스네이크 테두리를 부등호/연속보다 먼저(=아래) 쌓는다 — 겹칠 때 부등호/연속 표시가
     // 위로 보이도록. _updateSnakePaths()는 아래서 미리 만들어둔 빈 그룹을 그대로
@@ -117,9 +119,11 @@ export class BoardRenderer {
     this._gSnakePath = this._g('g-snake-path');
     this.svg.appendChild(this._gSnakePath);
 
-    // 에러 테두리 → 스네이크 → 부등호/연속 표시 순으로 위에 쌓이도록 삽입
     this._drawInequalities();
     this._drawConsecutives();
+
+    // 오류(빨강) 테두리는 스네이크/부등호/연속 등 기믹 표시보다 위에 — 오류 부분이 가려지지 않게.
+    this.svg.appendChild(this._gConflicts);
 
     Validator.validate(this.board);
     this._updateAll();
@@ -737,6 +741,46 @@ export class BoardRenderer {
       if (key === 'g-conflicts') continue;
       const [r, c] = key.split(',').map(Number);
       this._updateCell(r, c);
+    }
+    this._updateBoardGlow();
+  }
+
+  /** 선택 칸이 속한 9x9 판마다, 테두리 밖으로 점점 연해지는 초록 글로우 */
+  _updateBoardGlow() {
+    const g = this._gBoardGlow;
+    if (!g) return;
+    while (g.firstChild) g.removeChild(g.firstChild);
+    const sel = this.selectedCell;
+    if (!sel) return;
+
+    const grids = this.board.structures.filter((s) =>
+      s.type === 'grid9x9' &&
+      sel.row >= s.originRow && sel.row < s.originRow + 9 &&
+      sel.col >= s.originCol && sel.col < s.originCol + 9);
+
+    const LAYERS = [
+      { grow: 2,  width: 3, opacity: 0.45 },
+      { grow: 7,  width: 4, opacity: 0.24 },
+      { grow: 14, width: 6, opacity: 0.11 },
+      { grow: 23, width: 8, opacity: 0.045 },
+    ];
+    for (const gr of grids) {
+      const x0 = this._px(gr.originCol), y0 = this._py(gr.originRow);
+      const w = 9 * CELL, h = 9 * CELL;
+      for (const L of LAYERS) {
+        const r = this._el('rect');
+        r.setAttribute('x', x0 - L.grow);
+        r.setAttribute('y', y0 - L.grow);
+        r.setAttribute('width',  w + L.grow * 2);
+        r.setAttribute('height', h + L.grow * 2);
+        r.setAttribute('rx', 5 + L.grow);
+        r.setAttribute('fill', 'none');
+        r.setAttribute('stroke', 'var(--text-input)');
+        r.setAttribute('stroke-width', L.width);
+        r.setAttribute('opacity', L.opacity);
+        r.setAttribute('pointer-events', 'none');
+        g.appendChild(r);
+      }
     }
   }
 
