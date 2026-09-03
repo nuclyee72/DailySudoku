@@ -2,8 +2,9 @@
  * share.js — 데일리 결과 공유 텍스트 + 3x3 박스 정답률 이모지 그리드.
  *
  * 그리드: 퍼즐의 각 3x3 박스마다 "비-기본칸 중 정답과 일치하는 비율"을 5단계 색(각 20%)으로.
- *   0–20% 🟥 · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜ · (판 없는 칸) ⬛
- *   ↑ 빈칸을 전각 공백 대신 ⬛ 이모지로 채워, 폰트에 상관없이 대각/겹침 모양이 어긋나지 않게 한다.
+ *   0–20% ⬛ · 20–40% 🟫 · 40–60% 🟧 · 60–80% 🟨 · 80–100% 🟩 · (전부 기본칸) ⬜
+ *   겹치지 않은 자리는 이모지가 아니라 "앞쪽 공백(칸당 2칸) + 뒤쪽 잘라내기"로 처리한다.
+ *   (대각 모양이 계단처럼 들여쓰기됨. 이모지-공백 폭이 완전히 같진 않아 앱에 따라 살짝 밀릴 수 있음)
  *
  * 공유 텍스트 형식 (결과창 제목/상세와 같은 2줄 구성):
  *   2026-09-02 · 익스텐디드
@@ -15,9 +16,9 @@
  */
 export const VARIANT_LABEL = { standard: '스탠다드', extended: '익스텐디드' };
 
-const TIER_EMOJI = ['🟥', '🟫', '🟧', '🟨', '🟩'];
+const TIER_EMOJI = ['⬛', '🟫', '🟧', '🟨', '🟩'];
 const ALL_GIVEN_EMOJI = '⬜';
-const GAP = '⬛'; // 판이 없는 칸 — 이모지로 채워 폭을 맞춘다(전각 공백은 폰트마다 폭이 달라 어긋남)
+const GAP_SPACES = 2; // 겹치지 않은 박스 한 칸 = 공백 2칸 (이모지 대략 한 폭)
 
 /** 퍼즐에 존재하는 유일한 3x3 박스 원점들 (겹친 판이면 공유 박스는 1개로) */
 function boxOrigins(shape) {
@@ -57,11 +58,11 @@ export function buildShareGrid(board, solutionMap, shape) {
   const boxCols = [...new Set(origins.map((o) => o.col))].sort((a, b) => a - b);
   const present = new Set(origins.map((o) => `${o.row},${o.col}`));
 
+  const gap = ' '.repeat(GAP_SPACES);
   const lines = [];
   for (const br of boxRows) {
-    let line = '';
-    for (const bc of boxCols) {
-      if (!present.has(`${br},${bc}`)) { line += GAP; continue; }
+    const cells = boxCols.map((bc) => {
+      if (!present.has(`${br},${bc}`)) return null;
       let total = 0, correct = 0;
       for (let r = br; r < br + 3; r++) {
         for (let c = bc; c < bc + 3; c++) {
@@ -73,10 +74,14 @@ export function buildShareGrid(board, solutionMap, shape) {
           if (cell.value === solutionMap.get(key)) correct++;
         }
       }
-      if (total === 0) { line += ALL_GIVEN_EMOJI; continue; }
-      const tier = Math.min(4, Math.floor((correct / total) * 5));
-      line += TIER_EMOJI[tier];
-    }
+      if (total === 0) return ALL_GIVEN_EMOJI;
+      return TIER_EMOJI[Math.min(4, Math.floor((correct / total) * 5))];
+    });
+    // 뒤쪽 빈칸은 잘라내고, 앞·중간 빈칸만 공백으로 (대각 모양이 계단처럼 들여쓰기됨)
+    let last = cells.length - 1;
+    while (last >= 0 && cells[last] === null) last--;
+    let line = '';
+    for (let i = 0; i <= last; i++) line += cells[i] === null ? gap : cells[i];
     lines.push(line);
   }
   return lines;

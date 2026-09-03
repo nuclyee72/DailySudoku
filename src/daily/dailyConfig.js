@@ -10,8 +10,8 @@ import { seedRng, pick } from '../generator/random.js';
 
 export function dailySeed(dateStr) { return `daily:${dateStr}`; }
 
-/** 데일리 판 모양 후보 — 9x9 2판이 3칸 겹치는 배치 (세로/가로/대각) */
-export const DAILY_SHAPES = ['pair_h', 'pair_v', 'pair_diag'];
+/** 데일리 판 모양 후보 — 9x9 2판 겹침 (가로/세로/대각 3칸, 대각 6칸, 코너 3x6) */
+export const DAILY_SHAPES = ['pair_h', 'pair_v', 'pair_diag', 'pair_diag6', 'pair_corner'];
 
 // ── 요소 풀: 매일 main 풀에서 1개 + sub 풀에서 1개를 시드로 뽑는다 ──
 // 아래 상수(요소 풀 / 난이도 / 복원 비율)를 바꾸면 daily/*.json 을 반드시 다시 생성해야 한다:
@@ -25,6 +25,12 @@ export const SUB_ELEMENTS = ['snake', 'turntable'];
 export const DAILY_DIFFICULTY = 3;
 
 /**
+ * 겹침이 큰 모양 — 턴테이블과 조합하면 생성기가 유일해를 보장 못 함
+ * (회전 자유도 + 이중으로 겹친 행/열 제약). 이 모양이 나오면 sub는 스네이크로 강제.
+ */
+export const TIGHT_SHAPES = ['pair_diag6', 'pair_corner'];
+
+/**
  * 캐빙(given 최대 제거) 직후 되돌릴 given 비율. 난이도 3의 기본값은 0.175지만
  * 데일리는 시작을 더 빡세게 하려고 0.05로 낮춰 잡는다(값을 되돌릴수록 쉬워짐).
  * generatePuzzle 이 template.restoreRatio 로 받아 restoreRatioFor(difficulty)를 덮어쓴다.
@@ -36,11 +42,15 @@ const NONE_ELEMENTS = { inequality: 'none', consecutive: 'none', snake: 'none', 
 /** 그날의 모양/요소 조합을 결정적으로 뽑는다 */
 export function pickDailyMeta(dateStr) {
   seedRng(dailySeed(dateStr) + ':meta');
+  const shapeId = pick(DAILY_SHAPES);
+  const main = pick(MAIN_ELEMENTS);
+  let sub = pick(SUB_ELEMENTS);
+  if (TIGHT_SHAPES.includes(shapeId) && sub === 'turntable') sub = 'snake';
   return {
     date: dateStr,
-    shapeId: pick(DAILY_SHAPES),
-    main: pick(MAIN_ELEMENTS),
-    sub: pick(SUB_ELEMENTS),
+    shapeId,
+    main,
+    sub,
     difficulty: DAILY_DIFFICULTY,
   };
 }

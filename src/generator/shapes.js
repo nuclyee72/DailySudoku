@@ -8,6 +8,10 @@ export const shapes = [
   { id: 'pair_h', label: '가로 2개', boards: [{ row: 0, col: 0 }, { row: 0, col: 6 }] },
   { id: 'pair_v', label: '세로 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 0 }] },
   { id: 'pair_diag', label: '대각 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 6 }] },
+  // 6x6(박스 2x2 = 4개) 겹침 — 대각으로 더 깊게. 오프셋은 3의 배수라 3x3 박스 격자가 유지됨.
+  { id: 'pair_diag6', label: '대각 깊게 2개', boards: [{ row: 0, col: 0 }, { row: 3, col: 3 }] },
+  // 3x6(박스 2개) 코너 겹침 — 아래판이 오른쪽 아래로 {6,3} 이동
+  { id: 'pair_corner', label: '코너 3x6 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 3 }] },
   { id: 'staircase3', label: '계단형 3개', boards: [{ row: 0, col: 0 }, { row: 6, col: 6 }, { row: 12, col: 12 }] },
   { id: 'row3', label: '가로 3개', boards: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 0, col: 12 }] },
   {

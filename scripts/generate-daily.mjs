@@ -14,12 +14,30 @@ import { fileURLToPath } from 'node:url';
 
 import { seedRng } from '../src/generator/random.js';
 import { buildTemplateFromSelection } from '../src/generator/composeTemplate.js';
+import { getShape } from '../src/generator/shapes.js';
 import { generatePuzzle } from '../src/generator/generatePuzzle.js';
+import { solveBoard } from '../src/generator/solveBoard.js';
+import { reviveStructures } from '../src/puzzles/reviveStructures.js';
 import { dailySelections, dailySeed } from '../src/daily/dailyConfig.js';
 import { dateStrKST, shiftDateStr } from '../src/daily/dateUtil.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DAILY_DIR = path.join(__dirname, '..', 'daily');
+
+/**
+ * 생성 → 백트래킹 솔버로 "저장된 solution 과 유일하게 일치하는지" 검증 → 아니면 시드 바꿔 재시도.
+ * generatePuzzle 내부의 유일해 검사(countSolutions)가 턴테이블+겹침 조합에서 가끔 놓치는 걸 여기서 잡는다.
+ */
+async function generateVerified(seed, selection, tries = 10) {
+  for (let i = 0; i < tries; i++) {
+    seedRng(i === 0 ? seed : `${seed}:r${i}`);
+    const puzzle = await generatePuzzle(buildTemplateFromSelection(selection));
+    const sol = await solveBoard(reviveStructures(puzzle.structures), puzzle.givens);
+    if (sol && puzzle.solution.every((s) => sol.get(`${s.row},${s.col}`) === s.value)) return puzzle;
+    console.log(`  ⚠ ${seed} (${i + 1}/${tries}): 유일해 아님 — 시드 바꿔 재시도`);
+  }
+  throw new Error(`${seed}: 유일해 퍼즐을 못 만듦`);
+}
 
 async function generateForDate(dateStr) {
   const outPath = path.join(DAILY_DIR, `${dateStr}.json`);
@@ -31,17 +49,12 @@ async function generateForDate(dateStr) {
   const { meta, standard, extended } = dailySelections(dateStr);
   console.log(`▶ ${dateStr} 생성 중 (모양=${meta.shapeId}, main=${meta.main}, sub=${meta.sub})`);
 
-  seedRng(dailySeed(dateStr) + ':standard');
-  const stdTemplate = buildTemplateFromSelection(standard);
-  const std = await generatePuzzle(stdTemplate);
-
-  seedRng(dailySeed(dateStr) + ':extended');
-  const extTemplate = buildTemplateFromSelection(extended);
-  const ext = await generatePuzzle(extTemplate);
+  const std = await generateVerified(`${dailySeed(dateStr)}:standard`, standard);
+  const ext = await generateVerified(`${dailySeed(dateStr)}:extended`, extended);
 
   const payload = {
     date: dateStr,
-    shape: { id: meta.shapeId, boards: stdTemplate.boards },
+    shape: { id: meta.shapeId, boards: getShape(meta.shapeId).boards },
     difficulty: meta.difficulty,
     standard: {
       structures: std.structures,
