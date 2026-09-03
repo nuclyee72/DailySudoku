@@ -12,6 +12,10 @@ export const shapes = [
   { id: 'pair_diag6', label: '대각 깊게 2개', boards: [{ row: 0, col: 0 }, { row: 3, col: 3 }] },
   // 3x6(박스 2개) 코너 겹침 — 아래판이 오른쪽 아래로 {6,3} 이동
   { id: 'pair_corner', label: '코너 3x6 2개', boards: [{ row: 0, col: 0 }, { row: 6, col: 3 }] },
+  // 위 3종의 좌우 반전 (↙ 방향) — 아래판이 왼쪽 아래로. 생성기엔 거울상이라 동일하게 동작.
+  { id: 'pair_diag_bl',   label: '대각(↙) 2개',      boards: [{ row: 0, col: 6 }, { row: 6, col: 0 }] },
+  { id: 'pair_diag6_bl',  label: '대각 깊게(↙) 2개', boards: [{ row: 0, col: 3 }, { row: 3, col: 0 }] },
+  { id: 'pair_corner_bl', label: '코너 3x6(↙) 2개',  boards: [{ row: 0, col: 3 }, { row: 6, col: 0 }] },
   { id: 'staircase3', label: '계단형 3개', boards: [{ row: 0, col: 0 }, { row: 6, col: 6 }, { row: 12, col: 12 }] },
   { id: 'row3', label: '가로 3개', boards: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 0, col: 12 }] },
   {

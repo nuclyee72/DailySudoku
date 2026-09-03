@@ -126,7 +126,7 @@ const calShareNote       = document.getElementById('cal-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.17'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.18'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;

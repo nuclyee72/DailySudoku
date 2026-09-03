@@ -2337,10 +2337,12 @@ kbd {
 }
 
 .daily-result-grid {
-  margin: 0 auto 18px;
+  display: inline-block;   /* 내용 폭에 맞춘 박스가 부모의 text-align:center 로 가운데 정렬 */
+  margin: 0 0 18px;
   font-size: 22px;
   line-height: 1.25;
-  white-space: pre;   /* 공유 텍스트와 같은 문자열 그대로 (앞쪽 공백 들여쓰기 포함) */
+  white-space: pre;        /* 공유 텍스트와 같은 문자열 그대로 (앞쪽 공백 들여쓰기 포함) */
+  text-align: left;        /* 박스 안에서는 왼쪽 정렬 — 계단 들여쓰기가 어긋나지 않게 */
 }
 
 .daily-result-card .modal-actions { flex-wrap: wrap; }
