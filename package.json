@@ -1,6 +1,6 @@
 {
   "name": "daily-sudoku",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "private": true,
   "type": "module",
   "description": "변형 스도쿠 데일리 — 정적 사이트 (GitHub Pages) + Actions 일일 퍼즐 생성",

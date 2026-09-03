@@ -126,7 +126,7 @@ const calShareNote       = document.getElementById('cal-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.19'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.20'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -795,7 +795,10 @@ async function runStartDaily(variant) {
   currentPuzzleSolution = vd.solution ?? null;
   cachedSolution = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
 
-  const prog = loadProgress(TODAY(), variant);
+  // 퍼즐 지문 — 이게 다르면(예: 재생성으로 그 날 퍼즐이 바뀜) 저장된 진행 상황은 무시
+  const puzzleSig = String(data.generatedAt ?? '') + ':' + vd.givens.length + ':' + vd.solution.length;
+  let prog = loadProgress(TODAY(), variant);
+  if (prog && prog.sig && prog.sig !== puzzleSig) prog = null;
   if (prog && prog.cells) {
     board.loadSerialized(prog.cells);
     renderer.refresh();
@@ -804,6 +807,7 @@ async function runStartDaily(variant) {
   dailyRun = {
     date: TODAY(),
     variant,
+    sig: puzzleSig,
     elements: variant === 'extended' ? vd.elements : null,
     shape: data.shape,
     solutionMap: cachedSolution,
@@ -946,7 +950,7 @@ function persistDailyProgress(status) {
     dailyRun.runningSince = Date.now();
   }
   saveProgress({
-    date: dailyRun.date, variant: dailyRun.variant,
+    date: dailyRun.date, variant: dailyRun.variant, sig: dailyRun.sig,
     startedAt: dailyRun.startedAt, status,
     activeMs: dailyRun.activeMs,
     cells: board.serialize(),
@@ -983,7 +987,7 @@ function endDaily(status) {
   const pct = completionPct(board, dailyRun.solutionMap);
 
   saveProgress({
-    date: dailyRun.date, variant: dailyRun.variant,
+    date: dailyRun.date, variant: dailyRun.variant, sig: dailyRun.sig,
     startedAt: dailyRun.startedAt, status,
     activeMs: elapsedMs,
     cells: board.serialize(), elapsedMs, pct, finishedAt: Date.now(),
