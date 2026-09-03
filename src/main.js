@@ -20,7 +20,7 @@ import { layoutMode, isMobile, onLayoutChange } from './ui/layoutMode.js';
 
 import { dateStrKST, shiftDateStr, msUntilNextReset, formatCountdown } from './daily/dateUtil.js';
 import {
-  DAILY_LIMIT_MS, loadProgress, saveProgress, patchProgressCells,
+  DAILY_LIMIT_MS, loadProgress, saveProgress,
   recordResult, summarize, DIST_BUCKETS, FAIL_BUCKETS,
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
@@ -85,6 +85,7 @@ const btnGoLanding       = document.getElementById('btn-go-landing');
 
 const elementSidebar     = document.getElementById('element-sidebar');
 const btnDailyAbort      = document.getElementById('btn-daily-abort');
+const btnPause           = document.getElementById('btn-pause');
 
 const dailyResultModal   = document.getElementById('daily-result-modal');
 const dailyResultTitle   = document.getElementById('daily-result-title');
@@ -125,7 +126,7 @@ const calShareNote       = document.getElementById('cal-share-note');
 
 const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.12'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.13'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -147,7 +148,7 @@ function setTimerDanger(on)   { timerDisplay.classList.toggle('timer-danger', on
 // (renderer.selectFirstCell), 그 전에 반드시 선언돼 있어야 한다(TDZ 방지).
 let dailyData = null;
 let dailyDataDate = null;
-let dailyRun = null;       // { date, variant, elements, shape, solutionMap, deadlineTs, startedAt, ended }
+let dailyRun = null;       // { date, variant, elements, shape, solutionMap, startedAt, activeMs, runningSince, paused, pausedByUser, ended }
 let dailyCountdownRAF = null;
 let dailyPersistTimer = null;
 
@@ -713,16 +714,20 @@ btnArchive.addEventListener('click', () => showArchiveView());
 archiveBack.addEventListener('click', () => showMainView());
 
 btnGoLanding.addEventListener('click', () => {
-  // 시작 전(startedAt 없음)엔 타이머가 흐르지도, 저장할 것도 없으므로 안내 문구를 빼고 간단히 확인만
-  if (dailyRun && !dailyRun.ended && dailyRun.startedAt) {
-    askConfirm('메인 화면으로 돌아갈까요?<br/>진행 상황은 저장되고, 타이머는 계속 흘러갑니다.', () => {
-      persistDailyNow();
+  // 진행 중(시작함 · 일시정지 아님)일 때만 "시계 계속 흐름" 안내. 일시정지/시작 전엔 간단히.
+  if (dailyRun && !dailyRun.ended && dailyRun.startedAt && !dailyRun.paused) {
+    askConfirm('메인 화면으로 돌아갈까요?<br/>나가면 자동으로 일시정지되고, 이어서 풀 수 있어요.', () => {
+      pauseDaily(true);
       exitDailyMode();
       enterLanding();
     });
     return;
   }
-  askConfirm('메인 화면으로 돌아갈까요?', () => { exitDailyMode(); enterLanding(); });
+  askConfirm('메인 화면으로 돌아갈까요?', () => {
+    if (dailyRun && !dailyRun.ended && dailyRun.startedAt) persistDailyProgress('playing');
+    exitDailyMode();
+    enterLanding();
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -745,7 +750,7 @@ function refreshDailyCards() {
   for (const [variant, btn] of [['standard', btnDailyStandard], ['extended', btnDailyExtended]]) {
     const badge = btn.querySelector('.daily-card-status');
     const p = loadProgress(TODAY(), variant);
-    const expired = p && p.status === 'playing' && p.startedAt && Date.now() > p.startedAt + DAILY_LIMIT_MS;
+    const expired = p && p.status === 'playing' && (p.activeMs ?? 0) >= DAILY_LIMIT_MS;
     if (!p) { badge.textContent = '플레이 전'; badge.dataset.status = 'new'; }
     else if (p.status === 'solved') { badge.textContent = `✅ ${fmtMMSS(p.elapsedMs)}`; badge.dataset.status = 'solved'; }
     else if (p.status === 'timeout' || p.status === 'gaveup') {
@@ -803,7 +808,10 @@ async function runStartDaily(variant) {
     shape: data.shape,
     solutionMap: cachedSolution,
     startedAt: prog?.startedAt ?? null,
-    deadlineTs: prog?.startedAt ? prog.startedAt + DAILY_LIMIT_MS : null,
+    activeMs: prog?.activeMs ?? 0,   // 실제로 푼 누적 시간(일시정지·탭전환 중엔 안 흐름)
+    runningSince: null,               // 현재 활성 구간 시작 시각 (null = 정지/일시정지)
+    paused: false,                    // 일시정지 상태(수동/자동/재개대기 공용)
+    pausedByUser: false,              // 수동 일시정지 → 탭 복귀해도 자동 재개 안 함
     ended: prog ? prog.status !== 'playing' : false,
   };
 
@@ -811,6 +819,7 @@ async function runStartDaily(variant) {
   setFreePlayControls(false);
   // 도중 종료는 "시작" 이후에만 (시작 전엔 '메인 화면으로'로 나가면 됨)
   btnDailyAbort.classList.toggle('hidden', dailyRun.ended || !dailyRun.startedAt);
+  btnPause.classList.add('hidden');
   renderElementSidebar(dailyRun);
 
   timerEnabled = false;
@@ -831,46 +840,94 @@ async function runStartDaily(variant) {
   }
 
   if (dailyRun.startedAt) {
-    // 진행 중이던 판 재개
-    const remaining = dailyRun.deadlineTs - Date.now();
-    if (remaining <= 0) { endDaily('timeout'); return; }
-    setBoardLocked(false);
-    boardWrapper.classList.remove('blurred');
-    boardStartOverlay.classList.remove('show');
-    startDailyCountdown();
+    // 이미 시작했던 판 — 창을 닫았다 열면(#11) 항상 "일시정지 상태"로 재개
+    if (dailyRun.activeMs >= DAILY_LIMIT_MS) { endDaily('timeout'); return; }
+    dailyRun.paused = true;
+    dailyRun.pausedByUser = true; // 재개 버튼을 눌러야 시작
+    setBoardLocked(true);
+    boardWrapper.classList.add('blurred');
+    setStartOverlayLabel('재개');
+    boardStartOverlay.classList.add('show');
+    setTimerText(fmtRemain(DAILY_LIMIT_MS - dailyRun.activeMs));
+    setTimerDanger(false);
   } else {
     // 아직 시작 전 — 블러 + "시작" 오버레이
     setBoardLocked(true);
     boardWrapper.classList.add('blurred');
+    setStartOverlayLabel('시작');
     boardStartOverlay.classList.add('show');
     setTimerText(formatCountdown(DAILY_LIMIT_MS).slice(3)); // MM:SS
   }
 }
 
+function setStartOverlayLabel(t) { btnStartTimer.textContent = t; }
+
+/** 남은 ms → "MM:SS" */
+function fmtRemain(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
+/** 현재까지 실제로 푼 시간(ms) */
+function dailySpentMs() {
+  if (!dailyRun) return 0;
+  return dailyRun.activeMs + (dailyRun.runningSince ? Date.now() - dailyRun.runningSince : 0);
+}
+
 function beginDailyTimer() {
   if (!dailyRun || dailyRun.startedAt) return;
   dailyRun.startedAt = Date.now();
-  dailyRun.deadlineTs = dailyRun.startedAt + DAILY_LIMIT_MS;
+  dailyRun.activeMs = 0;
+  dailyRun.runningSince = Date.now();
+  dailyRun.paused = false;
+  dailyRun.pausedByUser = false;
   setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
   boardStartOverlay.classList.remove('show');
   btnDailyAbort.classList.remove('hidden'); // 시작했으니 이제 도중 종료 가능
-  saveProgress({
-    date: dailyRun.date, variant: dailyRun.variant,
-    startedAt: dailyRun.startedAt, status: 'playing',
-    cells: board.serialize(), elapsedMs: 0, finishedAt: null,
-  });
+  btnPause.classList.remove('hidden');
+  persistDailyProgress('playing');
+  startDailyCountdown();
+}
+
+/** 일시정지 — 시계를 멈추고(활성 시간 누적) 블러+재개 오버레이. byUser=false면 탭 전환/종료에 의한 자동 정지 */
+function pauseDaily(byUser) {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt || dailyRun.paused) return;
+  dailyRun.activeMs = dailySpentMs();
+  dailyRun.runningSince = null;
+  dailyRun.paused = true;
+  if (byUser) dailyRun.pausedByUser = true;
+  stopDailyCountdown();
+  setTimerDanger(false);
+  setBoardLocked(true);
+  boardWrapper.classList.add('blurred');
+  setStartOverlayLabel('재개');
+  boardStartOverlay.classList.add('show');
+  btnPause.classList.add('hidden');
+  persistDailyProgress('playing');
+}
+
+function resumeDaily() {
+  if (!dailyRun || dailyRun.ended || !dailyRun.paused) return;
+  if (dailyRun.activeMs >= DAILY_LIMIT_MS) { endDaily('timeout'); return; }
+  dailyRun.runningSince = Date.now();
+  dailyRun.paused = false;
+  dailyRun.pausedByUser = false;
+  setBoardLocked(false);
+  boardWrapper.classList.remove('blurred');
+  boardStartOverlay.classList.remove('show');
+  btnPause.classList.remove('hidden');
+  persistDailyProgress('playing');
   startDailyCountdown();
 }
 
 function startDailyCountdown() {
   stopDailyCountdown();
   const frame = () => {
-    if (!dailyRun || dailyRun.ended) return;
-    const remaining = dailyRun.deadlineTs - Date.now();
+    if (!dailyRun || dailyRun.ended || dailyRun.paused) return;
+    const remaining = DAILY_LIMIT_MS - dailySpentMs();
     if (remaining <= 0) { endDaily('timeout'); return; }
-    const t = Math.floor(remaining / 1000);
-    setTimerText(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+    setTimerText(fmtRemain(remaining));
     setTimerDanger(remaining < 60000);
     dailyCountdownRAF = requestAnimationFrame(frame);
   };
@@ -881,15 +938,32 @@ function stopDailyCountdown() {
   if (dailyCountdownRAF !== null) { cancelAnimationFrame(dailyCountdownRAF); dailyCountdownRAF = null; }
 }
 
-function scheduleDailyPersist() {
-  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
-  clearTimeout(dailyPersistTimer);
-  dailyPersistTimer = setTimeout(persistDailyNow, 800);
+/** 진행 상태를 localStorage에 저장 (activeMs 접어서). status='playing' 이면 진행 중 */
+function persistDailyProgress(status) {
+  if (!dailyRun) return;
+  if (dailyRun.runningSince) { // 흐르는 중이면 지금까지를 접고 기준점 재설정
+    dailyRun.activeMs = dailySpentMs();
+    dailyRun.runningSince = Date.now();
+  }
+  saveProgress({
+    date: dailyRun.date, variant: dailyRun.variant,
+    startedAt: dailyRun.startedAt, status,
+    activeMs: dailyRun.activeMs,
+    cells: board.serialize(),
+    elapsedMs: dailyRun.activeMs, finishedAt: status === 'playing' ? null : Date.now(),
+  });
 }
 
-function persistDailyNow() {
-  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
-  patchProgressCells(dailyRun.date, dailyRun.variant, board.serialize());
+function scheduleDailyPersist() {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt || dailyRun.paused) return;
+  clearTimeout(dailyPersistTimer);
+  dailyPersistTimer = setTimeout(() => persistDailyProgress('playing'), 800);
+}
+
+/** 탭 전환/창 닫기 — 자동 일시정지 (시계 멈춤, 재개는 사용자 몫이 아니라 자동) */
+function autoPauseDaily() {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt || dailyRun.paused) return;
+  pauseDaily(false);
 }
 
 function endDaily(status) {
@@ -898,18 +972,20 @@ function endDaily(status) {
   stopDailyCountdown();
   clearTimeout(dailyPersistTimer);
   btnDailyAbort.classList.add('hidden');
+  btnPause.classList.add('hidden');
   setBoardLocked(true);
   boardWrapper.classList.remove('blurred'); // 끝난 뒤엔 최종 보드가 그대로 보이게
+  boardStartOverlay.classList.remove('show');
   setTimerDanger(false);
 
-  const elapsedMs = dailyRun.startedAt
-    ? Math.min(DAILY_LIMIT_MS, Date.now() - dailyRun.startedAt)
-    : DAILY_LIMIT_MS;
+  const elapsedMs = dailyRun.startedAt ? Math.min(DAILY_LIMIT_MS, dailySpentMs()) : DAILY_LIMIT_MS;
+  dailyRun.runningSince = null;
   const pct = completionPct(board, dailyRun.solutionMap);
 
   saveProgress({
     date: dailyRun.date, variant: dailyRun.variant,
     startedAt: dailyRun.startedAt, status,
+    activeMs: elapsedMs,
     cells: board.serialize(), elapsedMs, pct, finishedAt: Date.now(),
   });
   recordResult(dailyRun.variant, dailyRun.date, status, elapsedMs, pct);
@@ -924,6 +1000,8 @@ function exitDailyMode() {
   elementSidebar.hidden = true;
   elementSidebar.innerHTML = '';
   btnDailyAbort.classList.add('hidden');
+  btnPause.classList.add('hidden');
+  setStartOverlayLabel('시작');
   setTimerDanger(false);
   setTimerShown(false);
   // 자유 연습 타이머 상태도 초기화 — 안 그러면 "타이머 켬 → 시작 안 하고 나가기 →
@@ -954,6 +1032,14 @@ btnDailyAbort.addEventListener('click', () => {
   // 시작 전엔 버튼 자체가 숨겨져 있으므로 여기 오면 항상 진행 중
   if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
   askConfirm('지금 종료할까요?<br/>이 판은 <b>실패</b>로 기록되고 오늘은 다시 풀 수 없어요.', () => endDaily('gaveup'));
+});
+
+btnPause.addEventListener('click', () => {
+  if (dailyRun && !dailyRun.ended && dailyRun.startedAt && !dailyRun.paused) {
+    keypadPanel.classList.remove('menu-open'); // 리모콘 닫고 재개 오버레이만 보이게
+    kpToggle.textContent = '‹';
+    pauseDaily(true);
+  }
 });
 
 // ── 요소 안내 사이드바 (책갈피) — 요소마다 독립된 책갈피 하나씩 ──
@@ -1398,6 +1484,7 @@ function armTimer() {
   renderTimerDisplay();
   setBoardLocked(true);
   boardWrapper.classList.add('blurred');
+  setStartOverlayLabel('시작');
   boardStartOverlay.classList.add('show');
 }
 function disarmTimer() {
@@ -1419,7 +1506,11 @@ timerToggleBtn.addEventListener('click', () => {
 });
 
 btnStartTimer.addEventListener('click', () => {
-  if (dailyRun && !dailyRun.ended) { beginDailyTimer(); return; }
+  if (dailyRun && !dailyRun.ended) {
+    if (dailyRun.paused) resumeDaily();
+    else if (!dailyRun.startedAt) beginDailyTimer();
+    return;
+  }
   if (!timerEnabled || timerRunning) return;
   setBoardLocked(false);
   boardWrapper.classList.remove('blurred');
@@ -1570,8 +1661,18 @@ function panLoop(t) {
 requestAnimationFrame(panLoop);
 
 // ── 진행 중이던 데일리 자동 저장 (탭 닫기/새로고침) ──
-window.addEventListener('beforeunload', persistDailyNow);
-document.addEventListener('visibilitychange', () => { if (document.hidden) persistDailyNow(); });
+// 창 닫기 / 탭 전환 → 데일리 자동 일시정지 (시계 멈춤). 탭 복귀 시 수동 정지가 아니면 자동 재개.
+window.addEventListener('beforeunload', () => {
+  if (dailyRun && !dailyRun.ended && dailyRun.startedAt && !dailyRun.paused) autoPauseDaily();
+});
+document.addEventListener('visibilitychange', () => {
+  if (!dailyRun || dailyRun.ended || !dailyRun.startedAt) return;
+  if (document.hidden) {
+    autoPauseDaily();
+  } else if (dailyRun.paused && !dailyRun.pausedByUser) {
+    resumeDaily();
+  }
+});
 
 // ── 테스트용: 콘솔에서 __resetDaily() 로 오늘 기록·진행상태를 지우고 새로고침 ──
 //    __resetDaily(true) 면 통계(연승 등)까지 전부 삭제.
