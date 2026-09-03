@@ -2340,8 +2340,7 @@ kbd {
   margin: 0 auto 18px;
   font-size: 22px;
   line-height: 1.25;
-  letter-spacing: 2px;
-  white-space: pre;
+  white-space: pre;   /* 공유 텍스트와 같은 문자열 그대로 (앞쪽 공백 들여쓰기 포함) */
 }
 
 .daily-result-card .modal-actions { flex-wrap: wrap; }
