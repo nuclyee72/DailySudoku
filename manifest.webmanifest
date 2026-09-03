@@ -1,0 +1,12 @@
+{
+  "name": "데일리 스도쿠",
+  "short_name": "데일리 스도쿠",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2f9e60",
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
+  ]
+}

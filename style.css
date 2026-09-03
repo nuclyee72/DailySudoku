@@ -131,6 +131,7 @@ html, body {
   font-weight: 700;
   color: var(--text-given);
 }
+.landing-title-icon { font-size: 0.9em; margin-right: 2px; }
 
 .landing-stack {
   display: flex;
