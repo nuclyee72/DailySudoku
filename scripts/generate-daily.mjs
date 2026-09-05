@@ -35,12 +35,17 @@ function puzzleIsSound(puzzle) {
   Validator.validate(gb);
   if (gb.getVisibleCells().some((c) => c.isConflict)) return 'givens 충돌';
 
-  // 2) 저장된 solution(턴테이블 칸 제외)을 채우면 — 충돌 0, isSolved, 모든 규칙 통과
-  const sb = new Board(); sb.addStructures(reviveStructures(puzzle.structures)); sb.loadGivens(puzzle.givens);
+  // 2) 저장된 solution(턴테이블 칸 제외)을 채우면 — 충돌 0, 턴테이블 아닌 칸은 전부 채워짐, 모든 규칙 통과.
+  //    턴테이블 칸의 given은 지금 화면에 스크램블(회전)된 값이라 그대로 얹으면 회전을 아직
+  //    안 맞춘 상태와 똑같이 충돌해버린다(solveBoard.js가 턴테이블 칸을 자유 칸으로 남기는
+  //    것과 같은 이유) — 여기서도 턴테이블 칸은 비워둔 채로 검사한다.
+  const sb = new Board(); sb.addStructures(reviveStructures(puzzle.structures));
+  const turntableKeys = sb.getTurntableCellKeys();
+  sb.loadGivens(puzzle.givens.filter((g) => !turntableKeys.has(`${g.row},${g.col}`)));
   for (const s of puzzle.solution) { const c = sb.getCell(s.row, s.col); if (c) c.value = s.value; }
   Validator.validate(sb);
   if (sb.getVisibleCells().some((c) => c.isConflict)) return 'solution 충돌';
-  if (!sb.isSolved()) return 'solution 미완성';
+  if (sb.getVisibleCells().some((c) => !turntableKeys.has(`${c.row},${c.col}`) && c.value === null)) return 'solution 미완성';
   for (const st of sb.structures) {
     if (st.type === 'snake') continue; // 스네이크는 렌더러 외곽선으로 따로 검사
     if ((st.validate(sb) ?? []).length) return `규칙 위반(${st.type})`;

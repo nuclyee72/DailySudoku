@@ -94,8 +94,10 @@ async function tryGenerate(template) {
   }
 
   // 회전 없이도 정답 방향이 뻔히 보이면(4방향 중 그럴듯한 게 1개뿐이면) 턴테이블이
-  // 장식으로 전락한다 — 난이도와 무관하게 항상 보정한다.
-  await relaxTurntableAmbiguity(board, turntables);
+  // 장식으로 전락한다 — 난이도와 무관하게 항상 보정한다. 그래도 화면에 나갈 회전
+  // 자체가 충돌 상태를 못 벗어나면(비-0 회전 전부 충돌) 이 시도는 버리고 다른 시드로
+  // 통째로 재시도한다 — given끼리 충돌한 채로 나가는 걸 여기서 막는다.
+  if (!(await relaxTurntableAmbiguity(board, turntables))) return null;
 
   const scrambleByOrigin = new Map(
     turntables.map(t => [`${t.originRow},${t.originCol}`, scrambledTurntableGrid(board, t)])

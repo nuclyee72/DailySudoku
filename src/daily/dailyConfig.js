@@ -22,11 +22,8 @@ export const DAILY_SHAPES = [
 //   rm daily/*.json && npm run generate-daily -- 2026-09-01 30
 /** main 풀 */
 export const MAIN_ELEMENTS = ['inequality', 'consecutive'];
-/**
- * sub 풀 — 턴테이블은 생성기(회전 스크램블 + 유일해 검사)가 불안정해서 데일리에서 뺐다.
- * 자유 연습에서는 계속 쓸 수 있다. 고치면 다시 넣고 daily/*.json 재생성할 것.
- */
-export const SUB_ELEMENTS = ['snake'];
+/** sub 풀 */
+export const SUB_ELEMENTS = ['snake', 'turntable'];
 
 /** 스네이크 길이·턴테이블 크기 범위를 정하는 난이도 — 데일리는 "보통"(3) 고정 */
 export const DAILY_DIFFICULTY = 3;
