@@ -42,3 +42,21 @@ jobs:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # 이 게임을 담은 ProjectDaily 허브(/ProjectDaily/)도 바로 재배포 — 코드 push·매일 퍼즐 커밋 모두
+  # 다른 레포의 워크플로를 실행하려면 PAT가 필요하다: 시크릿 HUB_DEPLOY_TOKEN
+  # (fine-grained, 저장소 nuclyee72/ProjectDaily 하나, 권한 Actions: Read and write)
+  notify-hub:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Trigger ProjectDaily deploy
+        env:
+          GH_TOKEN: ${{ secrets.HUB_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::HUB_DEPLOY_TOKEN 시크릿이 없어 허브 재배포를 건너뜀 (허브는 6시간마다 자동 배포)"
+            exit 0
+          fi
+          gh workflow run pages.yml -R nuclyee72/ProjectDaily
