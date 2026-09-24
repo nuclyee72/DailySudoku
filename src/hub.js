@@ -3,8 +3,10 @@
  *
  * - 허브(/ProjectDaily/)의 버튼은 `?open=<랜딩 버튼 id>`로 이 페이지를 연다 → 로드 직후 그 버튼을 대신 눌러 준다.
  * - 허브의 지난 퍼즐 달력은 `?archive=YYYY-MM-DD&mode=<모드>`로 연다 → main.js가 넘긴 playArchive로 바로 시작.
+ * - 허브의 자유 연습 모드 고르기는 `?free=<모드>`로 연다 → main.js가 넘긴 playFree로 바로 시작.
  * - 허브에서 들어온 탭에서는 "메인 화면" 역할을 허브가 하므로, 게임의 랜딩 메인으로 돌아가는
  *   대신 허브로 보낸다(leaveToHub). 주소로 직접 들어온 경우엔 지금까지처럼 게임 랜딩을 쓴다.
+ * - 허브는 통계를 카드 안에서 직접 보여 주며, 그 계산은 src/hubApi.js를 불러 쓴다.
  */
 // 절대 경로: 허브 안(/ProjectDaily/DailySudoku/)에서도, 예전 주소(/DailySudoku/)에서도 같은 허브로 간다
 const HUB_URL = '/ProjectDaily/';
@@ -26,14 +28,15 @@ export function leaveToHub() {
 
 /**
  * main.js 맨 끝(이벤트 연결·첫 화면 표시가 끝난 뒤)에서 한 번 호출
- * @param {{ playArchive?: (date: string, mode: string) => void }} [opts]
+ * @param {{ playArchive?: (date: string, mode: string) => void, playFree?: (mode: string) => void }} [opts]
  */
-export function initHub(slug, { playArchive } = {}) {
+export function initHub(slug, { playArchive, playFree } = {}) {
   hubSlug = slug;
   const params = new URLSearchParams(location.search);
   const openId = params.get('open');
   const archiveDate = params.get('archive');
-  const launched = Boolean(openId || archiveDate);
+  const freeMode = params.get('free');
+  const launched = Boolean(openId || archiveDate || freeMode);
   try {
     if (launched) sessionStorage.setItem(FROM_HUB_KEY(slug), '1');
     fromHub = sessionStorage.getItem(FROM_HUB_KEY(slug)) === '1';
@@ -47,6 +50,10 @@ export function initHub(slug, { playArchive } = {}) {
 
   if (archiveDate) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(archiveDate)) playArchive?.(archiveDate, params.get('mode') || 'standard');
+    return;
+  }
+  if (freeMode) {
+    playFree?.(freeMode);
     return;
   }
 
