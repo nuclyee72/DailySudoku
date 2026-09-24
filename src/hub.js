@@ -15,8 +15,19 @@ const FROM_HUB_KEY = (slug) => `daily-hub:from:${slug}`;
 let hubSlug = '';
 let fromHub = false;
 
+// 다크 모드는 허브·세 게임이 같이 쓴다 — 어디서 바꾸든 전부 같은 값으로 저장
+const DARK_KEYS = ['daily-dark-mode', 'sudoku-dark-mode', 'trilateral-dark-mode', 'wordship-dark-mode'];
+export function saveDarkMode(on) {
+  try { DARK_KEYS.forEach((k) => localStorage.setItem(k, on ? '1' : '0')); } catch { /* 무시 */ }
+}
+
+// 허브로 돌아갈 때 방문 기록을 쌓지 않는다 — 안 그러면 휴대폰 "뒤로"가 방금 나온 게임으로 되돌아간다.
+// 바로 앞 기록이 허브면 그리로 되돌아가고, 아니면 지금 기록을 허브로 바꿔 끼운다.
 export function goHub() {
-  location.href = `${HUB_URL}#${hubSlug}`;
+  let prevIsHub = false;
+  try { prevIsHub = history.length > 1 && new URL(document.referrer).pathname === HUB_URL; } catch { /* referrer 없음 */ }
+  if (prevIsHub) history.back();
+  else location.replace(`${HUB_URL}#${hubSlug}`);
 }
 
 /** 허브에서 들어온 탭이면 허브로 보내고 true — 호출부는 true면 원래의 랜딩 전환을 건너뛴다 */

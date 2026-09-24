@@ -2473,6 +2473,7 @@ kbd {
 .cal-cell--blank  { background: transparent; }
 .cal-cell--miss   { background: rgba(var(--text-given-rgb), 0.06); }
 .cal-cell--future { opacity: 0.3; }
+.cal-cell--locked { opacity: 0.3; } /* 첫 퍼즐 이전 — 퍼즐 자체가 없는 날 */
 .cal-cell--today  { box-shadow: inset 0 0 0 2px hsl(145 60% 28%); }
 .cal-cell--pickable { cursor: pointer; }
 .cal-cell--pickable:hover { box-shadow: inset 0 0 0 2px rgba(var(--text-given-rgb), 0.3); }

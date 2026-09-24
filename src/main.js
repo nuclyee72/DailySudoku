@@ -25,7 +25,7 @@ import {
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
 import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL, buildCalendarShareText } from './daily/share.js';
-import { initHub, leaveToHub } from './hub.js';
+import { initHub, leaveToHub, saveDarkMode } from './hub.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -1242,6 +1242,8 @@ function makeCalendar({ gridEl, titleEl, prevEl, nextEl, pick = false, onPick = 
         cell.appendChild(v);
       } else if (dateStr > today) {
         cell.classList.add('cal-cell--future');
+      } else if (minDate && dateStr < minDate) {
+        cell.classList.add('cal-cell--locked');
       } else {
         cell.classList.add('cal-cell--miss');
       }
@@ -1528,7 +1530,7 @@ btnStartTimer.addEventListener('click', () => {
 // ── 다크 모드 ──
 const DARK_MODE_KEY = 'sudoku-dark-mode';
 function saveDarkModePref(on) {
-  try { localStorage.setItem(DARK_MODE_KEY, on ? '1' : '0'); } catch { /* 무시 */ }
+  saveDarkMode(on); // 허브·다른 게임과 같이 (DARK_MODE_KEY 포함)
 }
 function applyDarkMode(on) {
   if (on) document.documentElement.setAttribute('data-theme', 'dark');
