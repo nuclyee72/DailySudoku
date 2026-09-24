@@ -115,7 +115,6 @@ const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 const landingMain        = document.getElementById('landing-main');
 const landingArchive     = document.getElementById('landing-archive');
 const landingCard        = document.querySelector('.landing-card');
-const archiveBack        = document.getElementById('archive-back');
 const archiveErrorEl     = document.getElementById('archive-error');
 const btnArchivePlay     = document.getElementById('btn-archive-play');
 const archiveCalEl       = document.getElementById('archive-cal');
@@ -713,7 +712,6 @@ btnFreePlay.addEventListener('click', () => {
 });
 
 btnArchive.addEventListener('click', () => showArchiveView());
-archiveBack.addEventListener('click', () => leaveToHub() || showMainView());
 
 btnGoLanding.addEventListener('click', () => {
   // 진행 중(시작함 · 일시정지 아님)일 때만 "시계 계속 흐름" 안내. 일시정지/시작 전엔 간단히.
@@ -1694,6 +1692,18 @@ window.__resetDaily = (wipeStats = false) => {
   location.reload();
 };
 
+// ── 허브의 지난 퍼즐 달력에서 고른 날짜로 바로 시작 (?archive=YYYY-MM-DD&mode=standard|extended) ──
+function playArchiveFromHub(date, mode) {
+  showArchiveView();
+  if (!['standard', 'extended'].includes(mode) || date < DAILY_FIRST_DATE || date >= TODAY()) return;
+  archiveVariant = mode;
+  archiveSelected = date;
+  document.querySelectorAll('#landing-archive .archive-type').forEach((b) => b.classList.toggle('active', b.dataset.variant === mode));
+  paintArchiveCal(true);
+  btnArchivePlay.disabled = false;
+  btnArchivePlay.click();
+}
+
 // ── 시작 ──
 refreshDailyCards();
-initHub('sudoku');
+initHub('sudoku', { playArchive: playArchiveFromHub });
