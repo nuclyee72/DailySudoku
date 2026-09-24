@@ -1314,6 +1314,7 @@ function showMainView() {
 
 function showArchiveView() {
   archiveSelected = null;
+  archiveVariant = 'standard'; // 들어올 때마다 스탠다드부터 (세 게임 공통)
   btnArchivePlay.disabled = true;
   archiveErrorEl.textContent = '';
   document.querySelectorAll('#landing-archive .archive-type').forEach((b) => {
