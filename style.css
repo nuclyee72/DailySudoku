@@ -133,6 +133,22 @@ html, body {
 }
 .landing-title-icon { font-size: 0.9em; margin-right: 2px; }
 
+/* 허브(ProjectDaily 메인)로 돌아가는 링크 — 카드 왼쪽 위 */
+.landing-card { position: relative; }
+.hub-back {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  color: rgba(var(--text-given-rgb), 0.55);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.hub-back:hover { background: var(--surface-1); color: var(--text-given); }
+
 .landing-stack {
   display: flex;
   flex-direction: column;

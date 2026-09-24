@@ -25,6 +25,7 @@ import {
 } from './daily/storage.js';
 import { ELEMENT_INFO } from './daily/elementInfo.js';
 import { buildShareText, buildShareGrid, completionPct, VARIANT_LABEL, buildCalendarShareText } from './daily/share.js';
+import { initHub, leaveToHub } from './hub.js';
 
 const svg          = document.getElementById('sudoku-svg');
 const boardPanel   = document.getElementById('board-panel');
@@ -696,6 +697,7 @@ function enterGame() {
 }
 
 function enterLanding() {
+  if (leaveToHub()) return; // 허브에서 들어왔으면 메인 화면 = 허브
   gameScreen.classList.add('hidden');
   landingScreen.classList.remove('hidden');
   closePanel(dailyResultModal);
@@ -711,7 +713,7 @@ btnFreePlay.addEventListener('click', () => {
 });
 
 btnArchive.addEventListener('click', () => showArchiveView());
-archiveBack.addEventListener('click', () => showMainView());
+archiveBack.addEventListener('click', () => leaveToHub() || showMainView());
 
 btnGoLanding.addEventListener('click', () => {
   // 진행 중(시작함 · 일시정지 아님)일 때만 "시계 계속 흐름" 안내. 일시정지/시작 전엔 간단히.
@@ -1573,7 +1575,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (!landingArchive.hidden) {
-    if (e.key === 'Escape') showMainView();
+    if (e.key === 'Escape') leaveToHub() || showMainView();
     return;
   }
 
@@ -1693,3 +1695,4 @@ window.__resetDaily = (wipeStats = false) => {
 
 // ── 시작 ──
 refreshDailyCards();
+initHub('sudoku');
