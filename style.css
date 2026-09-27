@@ -198,6 +198,15 @@ html, body {
 /* 카드 폭은 메인과 같게 고정 — 안쪽 여백만 줄여 달력 칸을 넓힌다 */
 .landing-card--archive { padding-left: 22px; padding-right: 22px; }
 
+/* 자유 연습 (랜딩 카드 안) — 제목은 허브 카드의 .sub-title과 같다 */
+.landing-sub-title {
+  margin: 0;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-given);
+}
+
 .archive-note {
   margin: 0;
   font-size: 12px;

@@ -74,6 +74,26 @@
         <button id="btn-archive-play" class="landing-btn landing-btn-primary" type="button" disabled>플레이</button>
       </div>
 
+      <!-- 자유 연습 — 메인 카드 안에서 #landing-main 과 교체 표시. 조합을 고르고 "시작"하면 만들어서 바로 시작 -->
+      <div id="landing-free" class="landing-stack" hidden>
+        <h3 class="landing-sub-title">자유 연습</h3>
+        <div class="generate-picker">
+          <div class="landing-field">
+            <label>모양</label>
+            <div id="free-shape-group" class="mode-toggle wrap"></div>
+          </div>
+          <div class="landing-field">
+            <label>요소</label>
+            <div id="free-element-group" class="element-slider-group"></div>
+          </div>
+          <div class="landing-field">
+            <label>난이도</label>
+            <div id="free-difficulty-group" class="mode-toggle"></div>
+          </div>
+          <button id="btn-free-start" type="button" class="landing-btn landing-btn-primary">시작</button>
+        </div>
+      </div>
+
       <p class="landing-footer">
         <a href="https://github.com/nuclyee72/DailySudoku" target="_blank" rel="noopener">nuclyee</a>
         <span aria-hidden="true">·</span>

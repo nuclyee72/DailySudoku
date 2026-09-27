@@ -114,7 +114,8 @@ const dailyStatsShareNote = document.getElementById('daily-stats-share-note');
 
 const landingMain        = document.getElementById('landing-main');
 const landingArchive     = document.getElementById('landing-archive');
-const landingCard        = document.querySelector('.landing-card');
+const landingFree        = document.getElementById('landing-free');
+const landingCard       = document.querySelector('.landing-card');
 const archiveErrorEl     = document.getElementById('archive-error');
 const btnArchivePlay     = document.getElementById('btn-archive-play');
 const archiveCalEl       = document.getElementById('archive-cal');
@@ -704,11 +705,28 @@ function enterLanding() {
   refreshDailyCards();
 }
 
+// ── 자유 연습 — 랜딩 카드 안에서 조합을 고르고(게임 안 "자동 생성" 창과 같은 고르기) 바로 시작 ──
+const freePicker = createPicker({
+  shapeEl: document.getElementById('free-shape-group'),
+  elementEl: document.getElementById('free-element-group'),
+  difficultyEl: document.getElementById('free-difficulty-group'),
+});
+
 btnFreePlay.addEventListener('click', () => {
+  landingMain.hidden = true;
+  landingFree.hidden = false;
+});
+
+document.getElementById('btn-free-start').addEventListener('click', () => {
+  const picked = freePicker.state;
+  // 고른 조합은 게임 안 "자동 생성" 창에도 그대로 이어 준다
+  generatePicker.setState({ ...picked, elements: { ...picked.elements } });
+  const template = buildTemplateFromSelection(resolveRandomSelection(picked));
   exitDailyMode();
   mountBoard(createStandardSudokuStructures(0, 0), []);
+  showMainView();
   enterGame();
-  openFloatingPanel(generatePanel);
+  runGenerate(template);
 });
 
 btnArchive.addEventListener('click', () => showArchiveView());
@@ -1308,6 +1326,7 @@ function paintArchiveCal(resetMonth) {
 
 function showMainView() {
   landingArchive.hidden = true;
+  landingFree.hidden = true;
   landingMain.hidden = false;
   landingCard.classList.remove('landing-card--archive');
 }
@@ -1575,7 +1594,7 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePanel(dailyResultModal);
     return;
   }
-  if (!landingArchive.hidden) {
+  if (!landingArchive.hidden || !landingFree.hidden) {
     if (e.key === 'Escape') leaveToHub() || showMainView();
     return;
   }
