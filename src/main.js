@@ -125,9 +125,8 @@ const archiveCalNext     = document.getElementById('archive-cal-next');
 const btnCalShare        = document.getElementById('btn-cal-share');
 const calShareNote       = document.getElementById('cal-share-note');
 
-const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
 const DAILY_FIRST_DATE = '2026-09-01'; // 아카이브에서 고를 수 있는 가장 이른 날짜
-const APP_VERSION = '1.0.24'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
+const APP_VERSION = '1.0.25'; // package.json / git 태그와 같이 올릴 것 (랜딩 하단 표시)
 {
   const vEl = document.getElementById('app-version');
   if (vEl) vEl.textContent = `v${APP_VERSION}`;
@@ -1128,7 +1127,6 @@ function currentShareText() {
     board,
     solutionMap: dailyRun.solutionMap,
     shape: dailyRun.shape,
-    url: SITE_URL,
   });
 }
 
@@ -1428,7 +1426,7 @@ btnCalShare.addEventListener('click', () => {
   const { y, m } = statsCal.monthYM();
   const s = summarize(statsVariant, TODAY());
   const text = buildCalendarShareText({
-    variant: statsVariant, results: s.results, year: y, month: m, url: SITE_URL,
+    variant: statsVariant, results: s.results, year: y, month: m,
   });
   shareText(text, calShareNote);
 });
@@ -1451,7 +1449,7 @@ btnDailyStatsShare.addEventListener('click', async () => {
   const solMap = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
   const text = buildShareText({
     date: TODAY(), variant: statsVariant, status: prog.status, elapsedMs: prog.elapsedMs,
-    board: tmp, solutionMap: solMap, shape: data.shape, url: SITE_URL,
+    board: tmp, solutionMap: solMap, shape: data.shape,
   });
   shareText(text, dailyStatsShareNote);
 });

@@ -9,8 +9,6 @@ import { buildCalendarShareText, buildShareText } from './daily/share.js';
 import { Board } from './core/Board.js';
 import { reviveStructures } from './puzzles/reviveStructures.js';
 
-const SITE_URL = 'https://nuclyee72.github.io/DailySudoku/';
-
 /** 숫자 4개 + 분포 막대 */
 export function stats(mode) {
   const s = summarize(mode, dateStrKST());
@@ -24,7 +22,7 @@ export function stats(mode) {
 /** 📋 달력 공유 문구 */
 export function calendarShareText(mode, year, month) {
   const { results } = summarize(mode, dateStrKST());
-  return buildCalendarShareText({ variant: mode, results, year, month, url: SITE_URL });
+  return buildCalendarShareText({ variant: mode, results, year, month });
 }
 
 /** 오늘 결과 공유 문구 — 오늘 그 모드를 아직 안 끝냈으면 null */
@@ -44,6 +42,6 @@ export async function todayShareText(mode) {
   const solutionMap = new Map((vd.solution ?? []).map((s) => [`${s.row},${s.col}`, s.value]));
   return buildShareText({
     date: today, variant: mode, status: prog.status, elapsedMs: prog.elapsedMs,
-    board, solutionMap, shape: data.shape, url: SITE_URL,
+    board, solutionMap, shape: data.shape,
   });
 }

@@ -6,15 +6,19 @@
  *   겹치지 않은(판 없는) 자리 = ⬛. 공백 대신 이모지로 채워야 앱마다 폭이 안 어긋난다
  *   (공백과 이모지의 폭 비율이 앱/폰트마다 달라 정렬이 절대 안 맞음).
  *
- * 공유 텍스트 형식 (결과창 제목/상세와 같은 2줄 구성):
- *   2026-09-02 · 익스텐디드
- *   12분 34초 · 100% ✅          (어떤 요소가 들어갔는지는 표시하지 않음)
+ * 공유 텍스트 형식 (ProjectDaily 네 게임 공통 — 제목 · 결과 줄 · 그림 · 허브 링크):
+ *   데일리 스도쿠 · 익스텐디드 · 2026-09-02
+ *   ✅ 100% · ⏱ 12:34          (어떤 요소가 들어갔는지는 표시하지 않음)
  *   (빈 줄)
  *   <그리드>
  *   (빈 줄)
- *   <링크>
+ *   <허브 링크>
  */
 export const VARIANT_LABEL = { standard: '스탠다드', extended: '익스텐디드' };
+
+export const GAME_TITLE = '데일리 스도쿠';
+/** 공유 링크 — 허브의 이 게임 카드 (네 게임 공통) */
+export const SHARE_URL = 'https://nuclyee72.github.io/ProjectDaily/#sudoku';
 
 const TIER_EMOJI = ['🟫', '🟥', '🟧', '🟨', '🟩'];
 const ALL_GIVEN_EMOJI = '⬜';
@@ -82,9 +86,10 @@ export function buildShareGrid(board, solutionMap, shape) {
   return lines;
 }
 
-function formatMinSec(ms) {
+/** ms → 'm:ss' (네 게임 공통 시간 표기) */
+function formatClock(ms) {
   const t = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(t / 60)}분 ${t % 60}초`;
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
 const CAL_EMOJI = { solved: '🟩', fail: '🟥', miss: '⬜', pad: '⬛' };
@@ -93,7 +98,7 @@ const CAL_EMOJI = { solved: '🟩', fail: '🟥', miss: '⬜', pad: '⬛' };
  * 통계 달력을 이모지 텍스트로. results = { 'YYYY-MM-DD': { status, ... } }
  * 성공 🟩 · 실패 🟥 · 안 함 ⬜ · 달 밖(주 정렬용) ⬛
  */
-export function buildCalendarShareText({ variant, results, year, month, url }) {
+export function buildCalendarShareText({ variant, results, year, month }) {
   const firstDow    = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const cells = [];
@@ -110,21 +115,14 @@ export function buildCalendarShareText({ variant, results, year, month, url }) {
   const rows = [];
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7).join(''));
 
-  const head = `데일리 스도쿠 ${VARIANT_LABEL[variant] ?? variant} · ${year}-${String(month).padStart(2, '0')}`;
-  const parts = [head, `✅ ${wins}  ❌ ${fails}`, '', ...rows, ''];
-  if (url) parts.push(url);
-  return parts.join('\n');
+  const head = [GAME_TITLE, VARIANT_LABEL[variant] ?? variant, `${year}-${String(month).padStart(2, '0')}`].join(' · ');
+  return [head, `✅ ${wins}  ❌ ${fails}`, '', ...rows, '', SHARE_URL].join('\n');
 }
 
 /** 데일리 결과 공유용 전체 텍스트 */
-export function buildShareText({ date, variant, status, elapsedMs, board, solutionMap, shape, url }) {
+export function buildShareText({ date, variant, status, elapsedMs, board, solutionMap, shape }) {
   const pct = completionPct(board, solutionMap);
-  const mark = status === 'solved' ? '✅' : '❌';
-
-  const head = `${date} · ${VARIANT_LABEL[variant] ?? variant}`;
-  const detail = `${formatMinSec(elapsedMs)} · ${pct}% ${mark}`;
-
-  const parts = [head, detail, '', ...buildShareGrid(board, solutionMap, shape), ''];
-  if (url) parts.push(url);
-  return parts.join('\n');
+  const head = [GAME_TITLE, VARIANT_LABEL[variant] ?? variant, date].join(' · ');
+  const detail = `${status === 'solved' ? '✅' : '❌'} ${pct}% · ⏱ ${formatClock(elapsedMs)}`;
+  return [head, detail, '', ...buildShareGrid(board, solutionMap, shape), '', SHARE_URL].join('\n');
 }
